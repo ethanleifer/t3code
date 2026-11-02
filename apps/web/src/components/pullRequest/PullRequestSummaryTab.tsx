@@ -76,6 +76,7 @@ import {
 } from "@t3tools/client-runtime/pull-request-editing";
 import { PullRequestMarkdown } from "./PullRequestMarkdown";
 import { PullRequestCommentBody } from "./PullRequestCommentBody";
+import { usePullRequestTaskToggle } from "./usePullRequestTaskToggle";
 import { PullRequestMoreReplies } from "./PullRequestMoreReplies";
 import { PullRequestMarkdownEditor } from "./PullRequestMarkdownEditor";
 import { PullRequestReactionBar } from "./PullRequestReactions";
@@ -163,6 +164,7 @@ interface CommentEditing {
   readonly saving: boolean;
   readonly onEdit: (comment: PullRequestComment | null) => void;
   readonly onSave: (comment: PullRequestComment, body: string) => void;
+  readonly saveTasks: (comment: PullRequestComment, body: string) => Promise<boolean>;
 }
 
 function CommentBody({
@@ -174,6 +176,10 @@ function CommentBody({
   editing: CommentEditing;
   className?: string | undefined;
 }) {
+  const tasks = usePullRequestTaskToggle(
+    comment.body,
+    editing.canEdit(comment) ? (body) => editing.saveTasks(comment, body) : null,
+  );
   if (editing.editingId === comment.id) {
     return (
       <PullRequestMarkdownEditor
@@ -194,10 +200,11 @@ function CommentBody({
       <PullRequestCommentBody
         key={comment.id}
         className="min-w-0 flex-1"
-        text={comment.body}
+        text={tasks.text}
         cwd={editing.cwd}
         environmentId={editing.environmentId}
         threadRef={editing.threadRef}
+        onTaskListChange={tasks.onTaskListChange}
       />
       {editing.canEdit(comment) ? (
         <PullRequestEditButton aria-label="Edit comment" onClick={() => editing.onEdit(comment)} />
@@ -535,6 +542,19 @@ export function PullRequestSummaryTab({
       }
       setCommentScope(null);
       onRefresh();
+    },
+    saveTasks: async (comment, body) => {
+      if (comment.kind === "review") return false;
+      const result = await updateComment({
+        environmentId,
+        input: { ...reference, commentId: comment.id, kind: comment.kind, body },
+      });
+      if (result._tag === "Failure") {
+        toastManager.add({ type: "error", title: "Could not update the task" });
+        return false;
+      }
+      onRefresh();
+      return true;
     },
   };
 

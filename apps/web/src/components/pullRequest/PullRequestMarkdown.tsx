@@ -53,6 +53,20 @@ function PullRequestHostVideo({
   );
 }
 
+/** Where each markdown segment begins in `text`, or -1. Segments keep the body's order. */
+function markdownSegmentStarts(
+  text: string,
+  segments: ReturnType<typeof splitPullRequestBody>,
+): ReadonlyArray<number> {
+  let searchFrom = 0;
+  return segments.map((segment) => {
+    if (segment.kind !== "markdown") return -1;
+    const start = text.indexOf(segment.text, searchFrom);
+    if (start >= 0) searchFrom = start + segment.text.length;
+    return start;
+  });
+}
+
 export function PullRequestMarkdown({
   text,
   cwd,
@@ -60,6 +74,7 @@ export function PullRequestMarkdown({
   threadRef,
   lineBreaks,
   className,
+  onTaskListChange,
 }: {
   text: string;
   cwd: string;
@@ -67,8 +82,11 @@ export function PullRequestMarkdown({
   threadRef?: ScopedThreadRef | null;
   lineBreaks?: boolean;
   className?: string;
+  /** Receives offsets into `text`, not into the segment that rendered the checkbox. */
+  onTaskListChange?: ((input: { markerOffset: number; checked: boolean }) => void) | undefined;
 }) {
   const segments = splitPullRequestBody(text);
+  const starts = markdownSegmentStarts(text, segments);
   const context = useContext(PullRequestMarkdownContext);
   const resolvedThreadRef = threadRef ?? context?.threadRef ?? undefined;
   return (
@@ -79,8 +97,9 @@ export function PullRequestMarkdown({
       )}
       data-image-gallery
     >
-      {segments.map((segment) => {
+      {segments.map((segment, index) => {
         if (segment.kind === "markdown" || segment.media === "image") {
+          const segmentStart = starts[index] ?? -1;
           return (
             <ChatMarkdown
               key={segment.id}
@@ -92,6 +111,12 @@ export function PullRequestMarkdown({
               {...(context ? { extraRemarkPlugins: context.remarkPlugins } : {})}
               lineBreaks={lineBreaks ?? context?.lineBreaks ?? false}
               sourceControlMedia
+              onTaskListChange={
+                onTaskListChange && segmentStart >= 0
+                  ? ({ markerOffset, checked }) =>
+                      onTaskListChange({ markerOffset: segmentStart + markerOffset, checked })
+                  : undefined
+              }
             />
           );
         }
