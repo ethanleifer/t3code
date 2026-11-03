@@ -23,15 +23,11 @@ export function getSidebarSectionNames(tagLists: ReadonlyArray<SectionTags>): st
   return [...names].toSorted((a, b) => a.localeCompare(b));
 }
 
-/**
- * Orders a shelf by section: threads without one first, then sections by name.
- * Threads keep their shelf order within a section.
- */
-export function groupThreadsBySection<T>(
+/** Splits a shelf into threads without a section and one group per section, sorted by name. */
+export function splitThreadsBySection<T>(
   threads: readonly T[],
   getTags: (thread: T) => SectionTags,
-): readonly T[] {
-  if (!threads.some((thread) => getThreadSection(getTags(thread)) !== null)) return threads;
+): { readonly unsectioned: readonly T[]; readonly sections: ReadonlyArray<SectionGroup<T>> } {
   const unsectioned: T[] = [];
   const bySection = new Map<string, T[]>();
   for (const thread of threads) {
@@ -44,12 +40,33 @@ export function groupThreadsBySection<T>(
     if (list === undefined) bySection.set(name, [thread]);
     else list.push(thread);
   }
-  return [
-    ...unsectioned,
-    ...[...bySection.keys()]
-      .toSorted((a, b) => a.localeCompare(b))
-      .flatMap((name) => bySection.get(name)!),
-  ];
+  const sections = [...bySection.keys()]
+    .toSorted((a, b) => a.localeCompare(b))
+    .map((name) => ({ name, threads: bySection.get(name)! }));
+  return { unsectioned, sections };
+}
+
+interface SectionGroup<T> {
+  readonly name: string;
+  readonly threads: readonly T[];
+}
+
+/**
+ * Orders a shelf by section: threads without one first, then sections by name.
+ * Threads keep their shelf order within a section.
+ */
+export function groupThreadsBySection<T>(
+  threads: readonly T[],
+  getTags: (thread: T) => SectionTags,
+): readonly T[] {
+  if (!threads.some((thread) => getThreadSection(getTags(thread)) !== null)) return threads;
+  const { unsectioned, sections } = splitThreadsBySection(threads, getTags);
+  return [...unsectioned, ...sections.flatMap((section) => section.threads)];
+}
+
+/** The key a section folder stores its open state under, beside project folders. */
+export function sectionFolderExpansionKey(name: string): string {
+  return sectionTag(name);
 }
 
 /** The tag changes that move a thread into `next`, or out of every section when it is null. */

@@ -15,6 +15,8 @@ import {
   getSidebarSectionNames,
   getThreadSection,
   groupThreadsBySection,
+  sectionFolderExpansionKey,
+  splitThreadsBySection,
 } from "./Sidebar.sections";
 import { useAtomValue } from "@effect/atom-react";
 import * as Option from "effect/Option";
@@ -274,6 +276,8 @@ import {
 import { SidebarDraftBlock } from "./sidebar/SidebarDraftBlock";
 import {
   SidebarProjectFolderHeader,
+  SidebarSectionFolderHeader,
+  sidebarSectionFolderRowId,
   sidebarFolderRowId,
 } from "./sidebar/SidebarProjectFolderHeader";
 import {
@@ -553,31 +557,53 @@ function useSidebarThreads(input: {
   const visibleWorkingThreads = workingShelfExpanded
     ? groupThreadsBySection(workingThreads, threadTags)
     : routeThreadOnly(workingThreads, routeRowThreadKey);
+  // Sectioned threads leave their project folders for one folder per section, across projects.
+  const activeBySection =
+    folderGroups === null ? null : splitThreadsBySection(activeThreads, threadTags);
+  const sectionFolders =
+    activeBySection?.sections.map((section) => {
+      const collapsed = !resolveProjectExpanded(projectExpandedById, [
+        sectionFolderExpansionKey(section.name),
+      ]);
+      return {
+        name: section.name,
+        collapsed,
+        threads: collapsed ? routeThreadOnly(section.threads, routeRowThreadKey) : section.threads,
+        hiddenThreads: collapsed
+          ? section.threads.filter((thread) => threadShellKey(thread) !== routeRowThreadKey)
+          : EMPTY_THREADS,
+      };
+    }) ?? null;
   const projectFolders =
-    folderGroups === null
+    folderGroups === null || activeBySection === null
       ? null
-      : groupSidebarThreadsByProject(folderGroups, activeThreads, keepEmpty).map((folder) => {
-          const collapsed = !resolveProjectExpanded(
-            projectExpandedById,
-            sidebarFolderExpansionKeys(folder.group),
-          );
-          return {
-            group: folder.group,
-            collapsed,
-            // A closed folder still shows the open thread, and hints at the rest.
-            threads: collapsed
-              ? routeThreadOnly(folder.threads, routeRowThreadKey)
-              : folder.threads,
-            hiddenThreads: collapsed
-              ? folder.threads.filter((thread) => threadShellKey(thread) !== routeRowThreadKey)
-              : EMPTY_THREADS,
-          };
-        });
+      : groupSidebarThreadsByProject(folderGroups, activeBySection.unsectioned, keepEmpty).map(
+          (folder) => {
+            const collapsed = !resolveProjectExpanded(
+              projectExpandedById,
+              sidebarFolderExpansionKeys(folder.group),
+            );
+            return {
+              group: folder.group,
+              collapsed,
+              // A closed folder still shows the open thread, and hints at the rest.
+              threads: collapsed
+                ? routeThreadOnly(folder.threads, routeRowThreadKey)
+                : folder.threads,
+              hiddenThreads: collapsed
+                ? folder.threads.filter((thread) => threadShellKey(thread) !== routeRowThreadKey)
+                : EMPTY_THREADS,
+            };
+          },
+        );
   const orderedThreads = [
     ...pinnedThreads,
     ...(projectFolders === null
       ? activeThreads
-      : projectFolders.flatMap((folder) => folder.threads)),
+      : [
+          ...(sectionFolders ?? []).flatMap((folder) => folder.threads),
+          ...projectFolders.flatMap((folder) => folder.threads),
+        ]),
     ...visibleWorkingThreads,
     ...visibleSnoozedThreads,
     ...renderedSettledThreads,
@@ -620,6 +646,11 @@ function useSidebarThreads(input: {
     workingShelfExpanded,
     toggleWorkingShelf: () => setWorkingShelfExpanded((value) => !value),
     projectFolders,
+    sectionFolders,
+    toggleSectionFolder: (name: string) => {
+      const keys = [sectionFolderExpansionKey(name)];
+      setProjectExpanded(keys, !resolveProjectExpanded(projectExpandedById, keys));
+    },
     toggleProjectFolder: (group: SidebarProjectSnapshot) => {
       const keys = sidebarFolderExpansionKeys(group);
       setProjectExpanded(keys, !resolveProjectExpanded(projectExpandedById, keys));
@@ -1350,6 +1381,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     toggleWorkingShelf,
     projectFolders,
     toggleProjectFolder,
+    sectionFolders,
+    toggleSectionFolder,
     renderedSettledThreads,
     visibleSnoozedThreads,
     visibleWorkingThreads,
@@ -2010,6 +2043,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     projectFolders
       ?.map((folder) => `${folder.group.projectKey}:${folder.threads.length}`)
       .join("\n") ?? "",
+    sectionFolders?.map((folder) => `${folder.name}:${folder.threads.length}`).join("\n") ?? "",
     visibleDraftSessionCount,
     routeDraftIdForRows ?? "",
   ].join("\0");
@@ -3547,6 +3581,26 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                         }
                         previousSectionKey = null;
                         if (projectFolders !== null && item.marker === "active-placeholder") {
+                          for (const folder of sectionFolders ?? []) {
+                            items.push(
+                              <SidebarSectionFolderHeader
+                                key={`section-folder:${folder.name}`}
+                                name={folder.name}
+                                collapsed={folder.collapsed}
+                                hiddenThreads={folder.hiddenThreads}
+                                onToggle={toggleSectionFolder}
+                              />,
+                            );
+                            for (const thread of folder.threads) {
+                              items.push(
+                                renderThreadRow(
+                                  thread,
+                                  "active",
+                                  sidebarSectionFolderRowId(folder.name),
+                                ),
+                              );
+                            }
+                          }
                           for (const folder of projectFolders) {
                             items.push(
                               <SidebarProjectFolderHeader

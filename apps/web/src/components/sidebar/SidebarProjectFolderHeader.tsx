@@ -1,6 +1,6 @@
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
 import { scopedThreadKey, scopeThreadRef } from "@t3tools/client-runtime/environment";
-import { ChevronDownIcon, SquarePenIcon } from "lucide-react";
+import { ChevronDownIcon, FolderIcon, SquarePenIcon } from "lucide-react";
 import { memo } from "react";
 
 import { cn } from "~/lib/utils";
@@ -30,6 +30,27 @@ export function sidebarFolderRowId(projectKey: string) {
   return `folder:${projectKey}`;
 }
 
+export function sidebarSectionFolderRowId(name: string) {
+  return `section-folder:${name}`;
+}
+
+function useClosedFolderDot(collapsed: boolean, hiddenThreads: readonly EnvironmentThreadShell[]) {
+  const localLastVisitedAtById = useUiStateStore((state) => state.threadLastVisitedAtById);
+  return collapsed
+    ? resolveSidebarFolderDot(
+        hiddenThreads.map((thread) => ({
+          ...thread,
+          lastVisitedAt: resolveThreadLastVisitedAt(
+            thread.lastVisitedAt,
+            localLastVisitedAtById[
+              scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id))
+            ],
+          ),
+        })),
+      )
+    : null;
+}
+
 /**
  * A project folder in the boring sidebar. It reads like a shelf header: a trailing
  * count and chevron, with the count and a status dot only while it is closed, so a
@@ -45,20 +66,7 @@ export const SidebarProjectFolderHeader = memo(function SidebarProjectFolderHead
 }) {
   const { group, collapsed, hiddenThreads } = props;
   const rowId = sidebarFolderRowId(group.projectKey);
-  const localLastVisitedAtById = useUiStateStore((state) => state.threadLastVisitedAtById);
-  const dot = collapsed
-    ? resolveSidebarFolderDot(
-        hiddenThreads.map((thread) => ({
-          ...thread,
-          lastVisitedAt: resolveThreadLastVisitedAt(
-            thread.lastVisitedAt,
-            localLastVisitedAtById[
-              scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id))
-            ],
-          ),
-        })),
-      )
-    : null;
+  const dot = useClosedFolderDot(collapsed, hiddenThreads);
   return (
     <li
       data-testid="sidebar-project-folder"
@@ -118,6 +126,55 @@ export const SidebarProjectFolderHeader = memo(function SidebarProjectFolderHead
           <TooltipPopup>New thread in {group.displayName}</TooltipPopup>
         </Tooltip>
       </span>
+    </li>
+  );
+});
+
+/** A section folder in the boring sidebar: the section's active threads from every project. */
+export const SidebarSectionFolderHeader = memo(function SidebarSectionFolderHeader(props: {
+  name: string;
+  collapsed: boolean;
+  hiddenThreads: readonly EnvironmentThreadShell[];
+  onToggle: (name: string) => void;
+}) {
+  const { name, collapsed, hiddenThreads } = props;
+  const dot = useClosedFolderDot(collapsed, hiddenThreads);
+  return (
+    <li
+      data-testid="sidebar-section-folder"
+      className="group/project-folder relative mt-2 list-none first:mt-0"
+    >
+      <button
+        type="button"
+        role="treeitem"
+        tabIndex={-1}
+        data-sidebar-row={sidebarSectionFolderRowId(name)}
+        aria-expanded={!collapsed}
+        onClick={() => props.onToggle(name)}
+        className="flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-(--control-radius) px-(--sidebar-row-content-inset) text-left outline-none hover:bg-sidebar-row-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+      >
+        <FolderIcon aria-hidden className="size-4 shrink-0 text-sidebar-muted-foreground" />
+        <span className="min-w-0 flex-1 truncate text-sm font-medium text-sidebar-foreground/90">
+          {name}
+        </span>
+        {dot ? (
+          <span className={cn("size-1.5 shrink-0 rounded-full", FOLDER_DOT_CLASS_NAME[dot])}>
+            <span className="sr-only">{FOLDER_DOT_LABEL[dot]}</span>
+          </span>
+        ) : null}
+        {collapsed && hiddenThreads.length > 0 ? (
+          <span className="shrink-0 text-xs tabular-nums text-sidebar-muted-foreground">
+            {hiddenThreads.length}
+          </span>
+        ) : null}
+        <ChevronDownIcon
+          aria-hidden
+          className={cn(
+            "size-3 shrink-0 text-sidebar-muted-foreground transition-transform",
+            collapsed && "-rotate-90",
+          )}
+        />
+      </button>
     </li>
   );
 });
