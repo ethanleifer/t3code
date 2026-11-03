@@ -23,6 +23,7 @@ import { AsyncResult } from "effect/reactivity";
 import { useRouter } from "@tanstack/react-router";
 
 import { getFallbackThreadIdAfterDelete, pinOrderKeyBetween } from "../components/Sidebar.logic";
+import { planThreadSectionTags } from "../components/Sidebar.sections";
 import { useComposerDraftStore } from "../composerDraftStore";
 import { environmentSession, readEnvironmentScope } from "../state/session";
 import { appAtomRegistry } from "../rpc/atomRegistry";
@@ -293,6 +294,9 @@ export function useThreadActions() {
     reportFailure: false,
   });
   const unpinThreadMutation = useOrchestrationCommand(threadEnvironment.unpin, {
+    reportFailure: false,
+  });
+  const setThreadTagMutation = useOrchestrationCommand(threadEnvironment.setTag, {
     reportFailure: false,
   });
   const setThreadAutoSettleMutation = useOrchestrationCommand(threadEnvironment.setAutoSettle, {
@@ -711,6 +715,18 @@ export function useThreadActions() {
     });
   };
 
+  const setThreadSection = async (target: ScopedThreadRef, section: string | null) => {
+    const changes = planThreadSectionTags(readThreadShell(target)?.source.tags, section);
+    for (const change of changes) {
+      const result = await setThreadTagMutation({
+        environmentId: target.environmentId,
+        input: { threadId: target.threadId, ...change },
+      });
+      if (result._tag === "Failure") return result;
+    }
+    return AsyncResult.success(undefined);
+  };
+
   const unpinThread = async (target: ScopedThreadRef) => {
     if (!readEnvironmentServerConfigLoaded(target.environmentId)) {
       return AsyncResult.failure(
@@ -959,6 +975,7 @@ export function useThreadActions() {
     unsnoozeThread,
     pinThread,
     unpinThread,
+    setThreadSection,
     confirmAndUnpinThread,
     reorderPinnedThread,
     reorderActiveThread,
