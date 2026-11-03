@@ -222,6 +222,7 @@ import {
   useSnoozeWakeClock,
   useThreadJumpHintsVisible,
   type SidebarListItem,
+  type SidebarListMarker,
   type SidebarSection,
   resolveSidebarRowThreadId,
 } from "./Sidebar.logic";
@@ -284,7 +285,6 @@ import {
   SidebarDragBoundary,
   SidebarSectionHeader,
   SidebarSectionPlaceholder,
-  SidebarThreadSectionLabel,
 } from "./sidebar/SidebarListMarkers";
 
 function sameSidebarProviderEntries(
@@ -420,6 +420,17 @@ function resolveDraggedOrders(input: {
   };
 }
 
+// The shelf whose rows follow each marker, so section folders know where to draw.
+const SHELF_BY_MARKER: Record<SidebarListMarker, SidebarSection | null> = {
+  "pinned-header": "pinned",
+  "pinned-divider": null,
+  "active-placeholder": "active",
+  "working-header": "working",
+  "snoozed-header": "snoozed",
+  "settled-header": null,
+  "settled-placeholder": "settled",
+};
+
 function routeThreadOnly(
   threads: readonly EnvironmentThreadShell[],
   routeThreadKey: string | null,
@@ -520,11 +531,36 @@ function useSidebarThreads(input: {
   });
 
   const { pinnedThreads, workingThreads, snoozedThreads, settledThreads } = partition;
-  // Folders already group Active rows, so sections only order the other shelves there.
   const activeThreads =
     folderGroups === null
       ? groupThreadsBySection(partition.activeThreads, threadTags)
       : partition.activeThreads;
+  // Each shelf lists unsectioned threads, then one collapsible folder per section.
+  const foldSections = (shelf: SidebarSection, list: readonly EnvironmentThreadShell[]) => {
+    const { unsectioned, sections } = splitThreadsBySection(list, threadTags);
+    const folders = sections.map((section) => {
+      const collapsed = !resolveProjectExpanded(projectExpandedById, [
+        sectionFolderExpansionKey(section.name),
+      ]);
+      return {
+        shelf,
+        name: section.name,
+        collapsed,
+        // A closed folder still shows the open thread, and counts the rest.
+        threads: collapsed ? routeThreadOnly(section.threads, routeRowThreadKey) : section.threads,
+        hiddenThreads: collapsed
+          ? section.threads.filter((thread) => threadShellKey(thread) !== routeRowThreadKey)
+          : EMPTY_THREADS,
+      };
+    });
+    return {
+      unsectioned,
+      folders,
+      threads:
+        sections.length === 0 ? list : [...unsectioned, ...folders.flatMap((f) => f.threads)],
+    };
+  };
+  const activeFold = foldSections("active", activeThreads);
   // Older settled threads load in pages; the shelf lists them only as far as they are loaded.
   const olderSettledShelf = useOlderSettledShelf({
     scopes: olderSettledScopes([...serverConfigs.keys()], scopedProjectKeys),
@@ -548,36 +584,26 @@ function useSidebarThreads(input: {
     }
     return visible.length === settledThreads.length ? settledThreads : visible;
   })();
-  const renderedSettledThreads = settledShelfExpanded
-    ? groupThreadsBySection(visibleSettledThreads, threadTags)
-    : routeThreadOnly(visibleSettledThreads, routeRowThreadKey);
-  const visibleSnoozedThreads = snoozedShelfExpanded
-    ? groupThreadsBySection(snoozedThreads, threadTags)
-    : routeThreadOnly(snoozedThreads, routeRowThreadKey);
-  const visibleWorkingThreads = workingShelfExpanded
-    ? groupThreadsBySection(workingThreads, threadTags)
-    : routeThreadOnly(workingThreads, routeRowThreadKey);
-  // Sectioned threads leave their project folders for one folder per section, across projects.
-  const activeBySection =
-    folderGroups === null ? null : splitThreadsBySection(activeThreads, threadTags);
-  const sectionFolders =
-    activeBySection?.sections.map((section) => {
-      const collapsed = !resolveProjectExpanded(projectExpandedById, [
-        sectionFolderExpansionKey(section.name),
-      ]);
-      return {
-        name: section.name,
-        collapsed,
-        threads: collapsed ? routeThreadOnly(section.threads, routeRowThreadKey) : section.threads,
-        hiddenThreads: collapsed
-          ? section.threads.filter((thread) => threadShellKey(thread) !== routeRowThreadKey)
-          : EMPTY_THREADS,
-      };
-    }) ?? null;
+  const settledFold = settledShelfExpanded ? foldSections("settled", visibleSettledThreads) : null;
+  const snoozedFold = snoozedShelfExpanded ? foldSections("snoozed", snoozedThreads) : null;
+  const workingFold = workingShelfExpanded ? foldSections("working", workingThreads) : null;
+  const renderedSettledThreads =
+    settledFold?.threads ?? routeThreadOnly(visibleSettledThreads, routeRowThreadKey);
+  const visibleSnoozedThreads =
+    snoozedFold?.threads ?? routeThreadOnly(snoozedThreads, routeRowThreadKey);
+  const visibleWorkingThreads =
+    workingFold?.threads ?? routeThreadOnly(workingThreads, routeRowThreadKey);
+  const sectionFoldersByShelf = {
+    active: activeFold.folders,
+    working: workingFold?.folders ?? [],
+    snoozed: snoozedFold?.folders ?? [],
+    settled: settledFold?.folders ?? [],
+  };
+  // In boring mode, sectioned threads leave their project folders for the section folders.
   const projectFolders =
-    folderGroups === null || activeBySection === null
+    folderGroups === null
       ? null
-      : groupSidebarThreadsByProject(folderGroups, activeBySection.unsectioned, keepEmpty).map(
+      : groupSidebarThreadsByProject(folderGroups, activeFold.unsectioned, keepEmpty).map(
           (folder) => {
             const collapsed = !resolveProjectExpanded(
               projectExpandedById,
@@ -599,9 +625,9 @@ function useSidebarThreads(input: {
   const orderedThreads = [
     ...pinnedThreads,
     ...(projectFolders === null
-      ? activeThreads
+      ? activeFold.threads
       : [
-          ...(sectionFolders ?? []).flatMap((folder) => folder.threads),
+          ...activeFold.folders.flatMap((folder) => folder.threads),
           ...projectFolders.flatMap((folder) => folder.threads),
         ]),
     ...visibleWorkingThreads,
@@ -646,7 +672,8 @@ function useSidebarThreads(input: {
     workingShelfExpanded,
     toggleWorkingShelf: () => setWorkingShelfExpanded((value) => !value),
     projectFolders,
-    sectionFolders,
+    sectionFoldersByShelf,
+    visibleActiveThreads: activeFold.threads,
     toggleSectionFolder: (name: string) => {
       const keys = [sectionFolderExpansionKey(name)];
       setProjectExpanded(keys, !resolveProjectExpanded(projectExpandedById, keys));
@@ -1381,7 +1408,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     toggleWorkingShelf,
     projectFolders,
     toggleProjectFolder,
-    sectionFolders,
+    sectionFoldersByShelf,
+    visibleActiveThreads,
     toggleSectionFolder,
     renderedSettledThreads,
     visibleSnoozedThreads,
@@ -1998,7 +2026,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     const pinnedRows = rowsOf(pinnedThreads, "pinned");
     items.push(...pinnedRows);
     items.push({ kind: "marker", marker: "pinned-divider" });
-    const activeRows = rowsOf(activeThreads, "active");
+    const activeRows = rowsOf(visibleActiveThreads, "active");
     items.push({ kind: "marker", marker: "active-placeholder" });
     items.push(...activeRows);
     if (workingThreads.length > 0) {
@@ -2043,7 +2071,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     projectFolders
       ?.map((folder) => `${folder.group.projectKey}:${folder.threads.length}`)
       .join("\n") ?? "",
-    sectionFolders?.map((folder) => `${folder.name}:${folder.threads.length}`).join("\n") ?? "",
+    Object.values(sectionFoldersByShelf)
+      .flat()
+      .map((folder) => `${folder.shelf}:${folder.name}:${folder.threads.length}`)
+      .join("\n"),
     visibleDraftSessionCount,
     routeDraftIdForRows ?? "",
   ].join("\0");
@@ -3419,8 +3450,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                       const renderThreadRow = (
                         thread: EnvironmentThreadShell,
                         section: SidebarSection,
-                        // The tree row of the project folder this row sits in.
+                        // The tree row of the folder this row sits in.
                         folderRow?: string,
+                        showProjectInFolder?: boolean,
                       ) => {
                         const threadKey = scopedThreadKey(
                           scopeThreadRef(thread.environmentId, thread.id),
@@ -3447,6 +3479,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                             }
                             thread={thread}
                             variant={rowVariant}
+                            showProjectInFolder={showProjectInFolder}
                             navigationParent={
                               folderRow ??
                               (section === "working" ||
@@ -3548,59 +3581,56 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           onDraftContextMenu={handleDraftContextMenu}
                         />,
                       ];
-                      const sectionCounts = new Map<string, number>();
-                      for (const item of sidebarListItems) {
-                        if (item.kind !== "thread" || item.section === "pinned") continue;
-                        const name = getThreadSection(threadByKey.get(item.key)?.source.tags);
-                        if (name === null) continue;
-                        const countKey = `${item.section}:${name}`;
-                        sectionCounts.set(countKey, (sectionCounts.get(countKey) ?? 0) + 1);
-                      }
-                      let previousSectionKey: string | null = null;
+                      // Section folders sit after a shelf's unsectioned rows, so they are drawn once per shelf.
+                      const drawnSectionShelves = new Set<SidebarSection>();
+                      const pushSectionFolders = (shelf: SidebarSection | null) => {
+                        if (shelf === null || shelf === "pinned") return;
+                        if (drawnSectionShelves.has(shelf)) return;
+                        drawnSectionShelves.add(shelf);
+                        for (const folder of sectionFoldersByShelf[shelf]) {
+                          items.push(
+                            <SidebarSectionFolderHeader
+                              key={`section-folder:${shelf}:${folder.name}`}
+                              rowId={sidebarSectionFolderRowId(shelf, folder.name)}
+                              name={folder.name}
+                              collapsed={folder.collapsed}
+                              threadCount={folder.threads.length + folder.hiddenThreads.length}
+                              hiddenThreads={folder.hiddenThreads}
+                              onToggle={toggleSectionFolder}
+                            />,
+                          );
+                          for (const thread of folder.threads) {
+                            items.push(
+                              renderThreadRow(
+                                thread,
+                                shelf,
+                                sidebarSectionFolderRowId(shelf, folder.name),
+                                true,
+                              ),
+                            );
+                          }
+                        }
+                      };
+                      let shelf: SidebarSection | null = null;
                       for (const item of sidebarListItems) {
                         if (item.kind === "thread") {
                           // Folders draw active rows in their own place below.
                           if (projectFolders !== null && item.section === "active") continue;
                           const thread = threadByKey.get(item.key)!;
-                          const sectionName =
-                            item.section === "pinned" ? null : getThreadSection(thread.source.tags);
-                          const sectionKey =
-                            sectionName === null ? null : `${item.section}:${sectionName}`;
-                          if (sectionKey !== null && sectionKey !== previousSectionKey) {
-                            items.push(
-                              <SidebarThreadSectionLabel
-                                key={`thread-section:${sectionKey}`}
-                                name={sectionName!}
-                                count={sectionCounts.get(sectionKey) ?? 0}
-                              />,
-                            );
+                          if (
+                            item.section !== "pinned" &&
+                            getThreadSection(thread.source.tags) !== null
+                          ) {
+                            pushSectionFolders(item.section);
+                            continue;
                           }
-                          previousSectionKey = sectionKey;
                           items.push(renderThreadRow(thread, item.section));
                           continue;
                         }
-                        previousSectionKey = null;
+                        pushSectionFolders(shelf);
+                        shelf = SHELF_BY_MARKER[item.marker];
                         if (projectFolders !== null && item.marker === "active-placeholder") {
-                          for (const folder of sectionFolders ?? []) {
-                            items.push(
-                              <SidebarSectionFolderHeader
-                                key={`section-folder:${folder.name}`}
-                                name={folder.name}
-                                collapsed={folder.collapsed}
-                                hiddenThreads={folder.hiddenThreads}
-                                onToggle={toggleSectionFolder}
-                              />,
-                            );
-                            for (const thread of folder.threads) {
-                              items.push(
-                                renderThreadRow(
-                                  thread,
-                                  "active",
-                                  sidebarSectionFolderRowId(folder.name),
-                                ),
-                              );
-                            }
-                          }
+                          pushSectionFolders("active");
                           for (const folder of projectFolders) {
                             items.push(
                               <SidebarProjectFolderHeader
@@ -3735,6 +3765,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                             break;
                         }
                       }
+                      pushSectionFolders(shelf);
                       return items;
                     })()}
                     {settledShelfExpanded && hiddenSettledCount > 0 ? (

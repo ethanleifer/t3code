@@ -1,6 +1,6 @@
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
 import { scopedThreadKey, scopeThreadRef } from "@t3tools/client-runtime/environment";
-import { ChevronDownIcon, FolderIcon, SquarePenIcon } from "lucide-react";
+import { ChevronDownIcon, FolderIcon, FolderOpenIcon, SquarePenIcon } from "lucide-react";
 import { memo } from "react";
 
 import { cn } from "~/lib/utils";
@@ -30,8 +30,8 @@ export function sidebarFolderRowId(projectKey: string) {
   return `folder:${projectKey}`;
 }
 
-export function sidebarSectionFolderRowId(name: string) {
-  return `section-folder:${name}`;
+export function sidebarSectionFolderRowId(shelf: string, name: string) {
+  return `section-folder:${shelf}:${name}`;
 }
 
 function useClosedFolderDot(collapsed: boolean, hiddenThreads: readonly EnvironmentThreadShell[]) {
@@ -130,30 +130,30 @@ export const SidebarProjectFolderHeader = memo(function SidebarProjectFolderHead
   );
 });
 
-/** A section folder in the boring sidebar: the section's active threads from every project. */
+/** A section folder: one section's threads on a shelf, from every project. */
 export const SidebarSectionFolderHeader = memo(function SidebarSectionFolderHeader(props: {
+  rowId: string;
   name: string;
   collapsed: boolean;
+  threadCount: number;
   hiddenThreads: readonly EnvironmentThreadShell[];
   onToggle: (name: string) => void;
 }) {
   const { name, collapsed, hiddenThreads } = props;
   const dot = useClosedFolderDot(collapsed, hiddenThreads);
+  const Icon = collapsed ? FolderIcon : FolderOpenIcon;
   return (
-    <li
-      data-testid="sidebar-section-folder"
-      className="group/project-folder relative mt-2 list-none first:mt-0"
-    >
+    <li data-testid="sidebar-section-folder" className="relative mt-2 list-none first:mt-0">
       <button
         type="button"
         role="treeitem"
         tabIndex={-1}
-        data-sidebar-row={sidebarSectionFolderRowId(name)}
+        data-sidebar-row={props.rowId}
         aria-expanded={!collapsed}
         onClick={() => props.onToggle(name)}
         className="flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-(--control-radius) px-(--sidebar-row-content-inset) text-left outline-none hover:bg-sidebar-row-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       >
-        <FolderIcon aria-hidden className="size-4 shrink-0 text-sidebar-muted-foreground" />
+        <Icon aria-hidden className="size-4 shrink-0 text-sidebar-foreground/60" />
         <span className="min-w-0 flex-1 truncate text-sm font-medium text-sidebar-foreground/90">
           {name}
         </span>
@@ -162,11 +162,9 @@ export const SidebarSectionFolderHeader = memo(function SidebarSectionFolderHead
             <span className="sr-only">{FOLDER_DOT_LABEL[dot]}</span>
           </span>
         ) : null}
-        {collapsed && hiddenThreads.length > 0 ? (
-          <span className="shrink-0 text-xs tabular-nums text-sidebar-muted-foreground">
-            {hiddenThreads.length}
-          </span>
-        ) : null}
+        <span className="shrink-0 text-xs tabular-nums text-sidebar-muted-foreground">
+          {props.threadCount}
+        </span>
         <ChevronDownIcon
           aria-hidden
           className={cn(

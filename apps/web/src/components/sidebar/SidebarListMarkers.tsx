@@ -146,16 +146,3 @@ export function SidebarSectionHeader(props: {
 }
 
 /** Labels where a user section starts inside a shelf. Not sortable: rows carry the order. */
-export function SidebarThreadSectionLabel(props: { name: string; count: number }) {
-  return (
-    <li
-      role="none"
-      data-thread-selection-safe
-      data-testid="sidebar-thread-section-label"
-      className="flex h-6 list-none items-end gap-2 px-2.5 pb-0.5 text-xs text-sidebar-muted-foreground"
-    >
-      <span className="min-w-0 truncate font-medium">{props.name}</span>
-      <span className="tabular-nums">{props.count}</span>
-    </li>
-  );
-}
