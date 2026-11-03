@@ -10,6 +10,12 @@ import {
 } from "./chat/threadContextDrag";
 import { discardComposerDraft } from "../lib/discardComposerDraft";
 import { requestCustomSnooze } from "./CustomSnoozeDialog";
+import { resolveSectionMenuChoice } from "./SectionNameDialog";
+import {
+  getSidebarSectionNames,
+  getThreadSection,
+  groupThreadsBySection,
+} from "./Sidebar.sections";
 import { useAtomValue } from "@effect/atom-react";
 import * as Option from "effect/Option";
 import { Atom } from "effect/reactivity";
@@ -145,6 +151,7 @@ import {
 } from "../state/environments";
 import {
   readThreadShell,
+  readThreadShells,
   useAllEnvironmentProjectSnapshotsReady,
   useDelegatedUnderParent,
   useProjects,
@@ -173,7 +180,9 @@ import { cn } from "~/lib/utils";
 import { ProjectEnvironmentBadge } from "./ProjectEnvironmentBadge";
 import {
   buildDraftActionMenuItems,
+  buildSectionMenuItem,
   buildThreadActionMenuItems,
+  parseSectionMenuAction,
   threadActionRequiresOperate,
 } from "./threadActionMenu.logic";
 import {
@@ -271,6 +280,7 @@ import {
   SidebarDragBoundary,
   SidebarSectionHeader,
   SidebarSectionPlaceholder,
+  SidebarThreadSectionLabel,
 } from "./sidebar/SidebarListMarkers";
 
 function sameSidebarProviderEntries(
@@ -364,6 +374,10 @@ interface SidebarThreadPartitionInput {
 
 function scrollSidebarToTop(content: HTMLElement | null) {
   content?.closest("[data-slot=scroll-area-viewport]")?.scrollTo({ top: 0 });
+}
+
+function threadTags(thread: EnvironmentThreadShell): ReadonlyArray<string> | undefined {
+  return thread.source.tags;
 }
 
 function threadShellKey(thread: Pick<SidebarThreadSummary, "environmentId" | "id">): string {
@@ -501,8 +515,12 @@ function useSidebarThreads(input: {
     clockKey: `${nowMinute}:${snoozeWakeClock}:${inboxReturnsVersion}`,
   });
 
-  const { pinnedThreads, activeThreads, workingThreads, snoozedThreads, settledThreads } =
-    partition;
+  const { pinnedThreads, workingThreads, snoozedThreads, settledThreads } = partition;
+  // Folders already group Active rows, so sections only order the other shelves there.
+  const activeThreads =
+    folderGroups === null
+      ? groupThreadsBySection(partition.activeThreads, threadTags)
+      : partition.activeThreads;
   // Older settled threads load in pages; the shelf lists them only as far as they are loaded.
   const olderSettledShelf = useOlderSettledShelf({
     scopes: olderSettledScopes([...serverConfigs.keys()], scopedProjectKeys),
@@ -527,13 +545,13 @@ function useSidebarThreads(input: {
     return visible.length === settledThreads.length ? settledThreads : visible;
   })();
   const renderedSettledThreads = settledShelfExpanded
-    ? visibleSettledThreads
+    ? groupThreadsBySection(visibleSettledThreads, threadTags)
     : routeThreadOnly(visibleSettledThreads, routeRowThreadKey);
   const visibleSnoozedThreads = snoozedShelfExpanded
-    ? snoozedThreads
+    ? groupThreadsBySection(snoozedThreads, threadTags)
     : routeThreadOnly(snoozedThreads, routeRowThreadKey);
   const visibleWorkingThreads = workingShelfExpanded
-    ? workingThreads
+    ? groupThreadsBySection(workingThreads, threadTags)
     : routeThreadOnly(workingThreads, routeRowThreadKey);
   const projectFolders =
     folderGroups === null
@@ -576,6 +594,7 @@ function useSidebarThreads(input: {
   }
   return {
     ...partition,
+    activeThreads,
     threads,
     workingShelfEnabled,
     searchableThreads: [
@@ -940,6 +959,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     unpinThread,
     confirmAndUnpinThread,
     setThreadAutoSettle,
+    setThreadSection,
     turnThreadIntoProject,
     reorderPinnedThread,
     reorderActiveThread,
@@ -2310,6 +2330,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       const unpinMenuItem = buildBulkUnpinContextMenuItem({
         pinnedCount: pinnedSelectedThreads.length,
       });
+      const selectedSections = new Set(
+        selectedThreads.map((thread) => getThreadSection(thread.source.tags)),
+      );
+      const sharedSection = selectedSections.size === 1 ? [...selectedSections][0]! : null;
       // Presets sync across environments, so the first selected thread's stand for all.
       // oxlint-disable-next-line react/purity -- runs in an event handler (oxc#27309)
       const menuOpenedAt = new Date();
@@ -2361,6 +2385,17 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                   },
                 ]
               : []),
+            {
+              ...buildSectionMenuItem({
+                label: `Move to section (${count})`,
+                current: sharedSection,
+                names: getSidebarSectionNames(readThreadShells().map((shell) => shell.source.tags)),
+                canRemove: selectedThreads.some(
+                  (thread) => getThreadSection(thread.source.tags) !== null,
+                ),
+              }),
+              disabled: !canOperateThreads(selectedThreads),
+            },
             { id: "mark-unread", label: `Mark unread (${count})` },
             {
               id: "delete",
@@ -2429,6 +2464,31 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               }),
             );
           }
+        }
+        return;
+      }
+      const sectionChoice = parseSectionMenuAction(clicked.value);
+      if (sectionChoice !== null) {
+        const target = await resolveSectionMenuChoice(sectionChoice);
+        if (target === null) return;
+        clearSelection();
+        for (const thread of selectedThreads) {
+          const result = await setThreadSection(
+            scopeThreadRef(thread.environmentId, thread.id),
+            target.section,
+          );
+          if (result._tag === "Success") continue;
+          if (!isAtomCommandInterrupted(result)) {
+            const error = squashAtomCommandFailure(result);
+            toastManager.add(
+              stackedThreadToast({
+                type: "error",
+                title: "Failed to change section",
+                description: error instanceof Error ? error.message : "An error occurred.",
+              }),
+            );
+          }
+          return;
         }
         return;
       }
@@ -2645,6 +2705,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                 canShareWithGuestAtom(threadRef.environmentId),
               ),
               canTurnIntoProject: canTurnThreadIntoProject(threadRef),
+              sections: {
+                current: getThreadSection(thread.source.tags),
+                names: getSidebarSectionNames(readThreadShells().map((shell) => shell.source.tags)),
+              },
               supports: {
                 settlement: configLoaded,
                 autoSettleOptOut: supportsAutoSettleOptOut,
@@ -2659,6 +2723,23 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         );
         if (clicked._tag === "Failure" || clicked.value === null) return;
         if (threadActionRequiresOperate(clicked.value) && !checkThreadOperations([thread])) return;
+        const sectionChoice = parseSectionMenuAction(clicked.value);
+        if (sectionChoice !== null) {
+          const target = await resolveSectionMenuChoice(sectionChoice);
+          if (target === null) return;
+          const result = await setThreadSection(threadRef, target.section);
+          if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
+            const error = squashAtomCommandFailure(result);
+            toastManager.add(
+              stackedThreadToast({
+                type: "error",
+                title: "Failed to change section",
+                description: error instanceof Error ? error.message : "An error occurred.",
+              }),
+            );
+          }
+          return;
+        }
         if (clicked.value?.startsWith("snooze:")) {
           const preset =
             clicked.value === "snooze:custom"
@@ -3433,13 +3514,38 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           onDraftContextMenu={handleDraftContextMenu}
                         />,
                       ];
+                      const sectionCounts = new Map<string, number>();
+                      for (const item of sidebarListItems) {
+                        if (item.kind !== "thread" || item.section === "pinned") continue;
+                        const name = getThreadSection(threadByKey.get(item.key)?.source.tags);
+                        if (name === null) continue;
+                        const countKey = `${item.section}:${name}`;
+                        sectionCounts.set(countKey, (sectionCounts.get(countKey) ?? 0) + 1);
+                      }
+                      let previousSectionKey: string | null = null;
                       for (const item of sidebarListItems) {
                         if (item.kind === "thread") {
                           // Folders draw active rows in their own place below.
                           if (projectFolders !== null && item.section === "active") continue;
-                          items.push(renderThreadRow(threadByKey.get(item.key)!, item.section));
+                          const thread = threadByKey.get(item.key)!;
+                          const sectionName =
+                            item.section === "pinned" ? null : getThreadSection(thread.source.tags);
+                          const sectionKey =
+                            sectionName === null ? null : `${item.section}:${sectionName}`;
+                          if (sectionKey !== null && sectionKey !== previousSectionKey) {
+                            items.push(
+                              <SidebarThreadSectionLabel
+                                key={`thread-section:${sectionKey}`}
+                                name={sectionName!}
+                                count={sectionCounts.get(sectionKey) ?? 0}
+                              />,
+                            );
+                          }
+                          previousSectionKey = sectionKey;
+                          items.push(renderThreadRow(thread, item.section));
                           continue;
                         }
+                        previousSectionKey = null;
                         if (projectFolders !== null && item.marker === "active-placeholder") {
                           for (const folder of projectFolders) {
                             items.push(
