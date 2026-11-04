@@ -483,6 +483,10 @@ export function useSettingsRestore(onRestored?: () => void) {
     ...(settings.sidebarWorkingShelfEnabled !== DEFAULT_UNIFIED_SETTINGS.sidebarWorkingShelfEnabled
       ? ["Working section"]
       : []),
+    ...(settings.sidebarWorkingShelfHidesWaiting !==
+    DEFAULT_UNIFIED_SETTINGS.sidebarWorkingShelfHidesWaiting
+      ? ["Waiting threads in Working"]
+      : []),
     ...(settings.sidebarAutoSettleAfterDays !== DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleAfterDays
       ? ["Auto-settle inactive threads"]
       : []),
@@ -652,6 +656,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       sidebarProjectGroupingMode: DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode,
       sidebarProjectSortOrder: DEFAULT_UNIFIED_SETTINGS.sidebarProjectSortOrder,
       sidebarWorkingShelfEnabled: DEFAULT_UNIFIED_SETTINGS.sidebarWorkingShelfEnabled,
+      sidebarWorkingShelfHidesWaiting: DEFAULT_UNIFIED_SETTINGS.sidebarWorkingShelfHidesWaiting,
       sidebarAutoSettleAfterDays: DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleAfterDays,
       sidebarAutoSettleKeepPullRequests: DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleKeepPullRequests,
       sidebarAutoSettleOnMerge: DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleOnMerge,
@@ -905,6 +910,34 @@ export function GeneralSettingsPanel() {
                 updateSettings({ sidebarWorkingShelfEnabled: Boolean(checked) })
               }
               aria-label="Working section"
+            />
+          }
+        />
+        <SettingsRow
+          {...searchableSetting("working-shelf-hides-waiting")}
+          description="Keep idle threads, and threads waiting on another thread, in the inbox instead of the Working section."
+          resetAction={
+            settings.sidebarWorkingShelfHidesWaiting !==
+            DEFAULT_UNIFIED_SETTINGS.sidebarWorkingShelfHidesWaiting ? (
+              <SettingResetButton
+                label="waiting threads in Working"
+                onClick={() =>
+                  updateSettings({
+                    sidebarWorkingShelfHidesWaiting:
+                      DEFAULT_UNIFIED_SETTINGS.sidebarWorkingShelfHidesWaiting,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <Switch
+              checked={settings.sidebarWorkingShelfHidesWaiting}
+              disabled={!settings.sidebarWorkingShelfEnabled}
+              onCheckedChange={(checked) =>
+                updateSettings({ sidebarWorkingShelfHidesWaiting: Boolean(checked) })
+              }
+              aria-label="Keep waiting threads out of Working"
             />
           }
         />
