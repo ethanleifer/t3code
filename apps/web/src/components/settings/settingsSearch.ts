@@ -454,6 +454,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["hide fold running monitoring threads inbox sidebar shelf"],
   },
   {
+    id: "working-shelf-hides-waiting",
+    title: "Keep waiting threads out of Working",
+    to: "/settings/general",
+    searchTerms: ["waiting idle working section inbox sidebar shelf"],
+  },
+  {
     id: "boring-sidebar",
     title: "Boring sidebar (group by project)",
     to: "/settings/labs",

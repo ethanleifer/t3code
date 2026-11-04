@@ -353,6 +353,7 @@ interface SidebarThreadPartitionInput {
   readonly connectedEnvironmentIds: readonly EnvironmentId[];
   readonly optimisticDrop: SidebarOptimisticDrop | null;
   readonly workingShelfEnabled: boolean;
+  readonly workingShelfHidesWaiting: boolean;
   /** Boring mode: folders list active threads by the user's latest message. */
   readonly sortActiveBySend: boolean;
   readonly disconnectedEnvironmentIds: ReadonlySet<EnvironmentId>;
@@ -441,6 +442,7 @@ function useSidebarThreads(input: {
   // Folders already separate the work, so boring mode has no Working shelf.
   const workingShelfEnabled =
     useClientSettings((s) => s.sidebarWorkingShelfEnabled) && folderGroups === null;
+  const workingShelfHidesWaiting = useClientSettings((s) => s.sidebarWorkingShelfHidesWaiting);
   const environmentConnections = useEnvironmentConnectionSummaries();
   const liveShellEnvironmentIds = useAtomValue(liveShellEnvironmentIdsAtom);
   const disconnectedEnvironmentIds = new Set(
@@ -496,6 +498,7 @@ function useSidebarThreads(input: {
     connectedEnvironmentIds,
     optimisticDrop,
     workingShelfEnabled,
+    workingShelfHidesWaiting,
     sortActiveBySend: folderGroups !== null,
     disconnectedEnvironmentIds,
     clockKey: `${nowMinute}:${snoozeWakeClock}:${inboxReturnsVersion}`,
@@ -632,6 +635,7 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
     serverConfigs,
     optimisticDrop,
     workingShelfEnabled,
+    workingShelfHidesWaiting,
     sortActiveBySend,
     disconnectedEnvironmentIds,
   } = input;
@@ -646,6 +650,7 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
       enabled: workingShelfEnabled,
       disconnectedEnvironmentIds,
       isWorking: manuallyMoved ? isThreadWorking : inboxObservation.isWorking,
+      hidesWaiting: workingShelfHidesWaiting,
     })
       ? working
       : active;
