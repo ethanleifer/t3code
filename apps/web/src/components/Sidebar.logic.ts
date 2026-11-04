@@ -193,18 +193,23 @@ export function isSidebarEnvironmentDisconnected(
   return phase !== "connecting" && (phase !== "connected" || !shellIsLive);
 }
 
-export function belongsInSidebarWorkingShelf<T extends { readonly environmentId: EnvironmentId }>(
+export function belongsInSidebarWorkingShelf<
+  T extends { readonly environmentId: EnvironmentId } & SidebarThreadStatusInput,
+>(
   thread: T,
   input: {
     readonly enabled: boolean;
     readonly disconnectedEnvironmentIds: ReadonlySet<EnvironmentId>;
     readonly isWorking: (thread: T) => boolean;
+    /** Idle threads, and threads waiting on another thread, stay in the inbox. */
+    readonly hidesWaiting: boolean;
   },
 ): boolean {
   return (
     input.enabled &&
     !input.disconnectedEnvironmentIds.has(thread.environmentId) &&
-    input.isWorking(thread)
+    input.isWorking(thread) &&
+    !(input.hidesWaiting && resolveSidebarThreadStatus(thread) === "waiting")
   );
 }
 

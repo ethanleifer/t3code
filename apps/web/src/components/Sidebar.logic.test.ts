@@ -992,6 +992,7 @@ describe("Working shelf (beta)", () => {
         enabled,
         disconnectedEnvironmentIds: new Set(disconnected),
         isWorking: isSidebarThreadWorking,
+        hidesWaiting: false,
       });
 
     expect(shelve([])).toBe(true);
@@ -999,6 +1000,25 @@ describe("Working shelf (beta)", () => {
     expect(shelve([])).toBe(true);
     expect(shelve([EnvironmentId.make("environment-other")])).toBe(true);
     expect(shelve([], false)).toBe(false);
+  });
+
+  it("keeps waiting threads in the inbox when the shelf hides them", () => {
+    const shelve = (thread: Parameters<typeof isSidebarThreadWorking>[0], hidesWaiting: boolean) =>
+      belongsInSidebarWorkingShelf(
+        { ...thread, environmentId: localEnvironmentId },
+        {
+          enabled: true,
+          disconnectedEnvironmentIds: new Set(),
+          isWorking: isSidebarThreadWorking,
+          hidesWaiting,
+        },
+      );
+    const blocked = { ...idle, runtime, blockedOnThreadWait: true };
+
+    expect(shelve(waiting, false)).toBe(true);
+    expect(shelve(waiting, true)).toBe(false);
+    expect(shelve(blocked, true)).toBe(false);
+    expect(shelve({ ...idle, runtime }, true)).toBe(true);
   });
 
   describe("sortInboxThreadsByReturn", () => {
