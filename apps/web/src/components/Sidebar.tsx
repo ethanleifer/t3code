@@ -41,7 +41,11 @@ import {
   threadSearchSubject,
   type ShownOrder,
 } from "@t3tools/client-runtime/state/thread-search";
-import { foldSearchQuery, rankMessageMatches } from "@t3tools/shared/paletteSearch";
+import {
+  foldSearchQuery,
+  parseThreadTagQuery,
+  rankMessageMatches,
+} from "@t3tools/shared/paletteSearch";
 import { findForMessageMatch, openThreadFindOnQuery } from "./chat/threadFindStore";
 import {
   threadRuntimeCanArchive,
@@ -179,6 +183,8 @@ import {
 } from "./threadActionMenu.logic";
 import {
   applySidebarThreadDrop,
+  filterSidebarThreadsByTags,
+  mergeThreadTagDefinitions,
   filterSidebarV2VisibleThreads,
   groupSidebarThreadsByProject,
   sidebarFolderExpansionKeys,
@@ -198,6 +204,7 @@ import {
   resolveSidebarDropVerb,
   resolveSidebarThreadSection,
   resolveSidebarReorderableThreadKeys,
+  resolveSidebarTagFilter,
   searchSidebarThreads,
   shouldCreateNewThreadInCurrentProject,
   shouldNavigateAfterThreadPark,
@@ -253,6 +260,7 @@ import {
 import { SidebarContent, SidebarGroup, useSidebar } from "./ui/sidebar";
 import { SidebarChromeFooter, SidebarChromeHeader } from "./sidebar/SidebarChrome";
 import { SidebarHeaderIconButton, SidebarThreadHeader } from "./sidebar/SidebarThreadHeader";
+import { SidebarActiveTagFilter, SidebarTagFilterMenu } from "./sidebar/SidebarTagFilter";
 import { TooltipProvider } from "./ui/tooltip";
 import { composerDraftHasUserContent, DraftId, useComposerDraftStore } from "../composerDraftStore";
 import { useThreadRouteTarget } from "../hooks/useThreadRouteTarget";
@@ -347,6 +355,8 @@ type SidebarOptimisticDrop = {
 interface SidebarThreadPartitionInput {
   readonly threads: readonly EnvironmentThreadShell[];
   readonly scopedProjectKeys: ReadonlySet<string> | null;
+  /** Defined tags a listed thread must all carry, or null for every thread. */
+  readonly tagFilter: readonly string[] | null;
   /** Tasks linked environments run for a listed thread; they show under it. */
   readonly delegatedUnderParent: ReadonlySet<string>;
   readonly serverConfigs: ReadonlyMap<EnvironmentId, EnvironmentServerConfig>;
@@ -415,6 +425,7 @@ function routeThreadOnly(
 function useSidebarThreads(input: {
   readonly projectScopeKey: string | null;
   readonly scopedProjectKeys: ReadonlySet<string> | null;
+  readonly tagFilter: readonly string[] | null;
   readonly serverConfigs: ReadonlyMap<EnvironmentId, EnvironmentServerConfig>;
   readonly connectedEnvironmentIds: readonly EnvironmentId[];
   readonly optimisticDrop: SidebarOptimisticDrop | null;
@@ -429,6 +440,7 @@ function useSidebarThreads(input: {
   const {
     projectScopeKey,
     scopedProjectKeys,
+    tagFilter,
     serverConfigs,
     connectedEnvironmentIds,
     optimisticDrop,
@@ -480,6 +492,7 @@ function useSidebarThreads(input: {
   const partition = partitionSidebarThreads({
     threads,
     scopedProjectKeys,
+    tagFilter,
     delegatedUnderParent,
     serverConfigs,
     connectedEnvironmentIds,
@@ -495,13 +508,15 @@ function useSidebarThreads(input: {
   // Older settled threads load in pages; the shelf lists them only as far as they are loaded.
   const olderSettledShelf = useOlderSettledShelf({
     scopes: olderSettledScopes([...serverConfigs.keys()], scopedProjectKeys),
-    expanded: settledShelfExpanded,
+    // Tags filter loaded shells only; older pages would be read without end for a rare tag.
+    expanded: settledShelfExpanded && tagFilter === null,
     visibleCount: settledVisibleCount,
   });
   const listedSettledThreads = settledThreads.filter(olderSettledShelf.isListed);
   useOlderSettledShelfGrowth(olderSettledShelf, listedSettledThreads);
   const settledCount =
-    settledThreads.length + olderSettledShelf.unloadedCount(partition.visibleThreads);
+    settledThreads.length +
+    (tagFilter === null ? olderSettledShelf.unloadedCount(partition.visibleThreads) : 0);
   const visibleSettledThreads = (() => {
     const visible = listedSettledThreads.slice(0, settledVisibleCount);
     if (
@@ -617,6 +632,7 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
   const {
     threads,
     scopedProjectKeys,
+    tagFilter,
     delegatedUnderParent,
     serverConfigs,
     optimisticDrop,
@@ -625,7 +641,10 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
     sortActiveBySend,
   } = input;
   const preciseNow = new Date().toISOString();
-  const visible = filterSidebarV2VisibleThreads(threads, scopedProjectKeys, delegatedUnderParent);
+  const visible = filterSidebarThreadsByTags(
+    filterSidebarV2VisibleThreads(threads, scopedProjectKeys, delegatedUnderParent),
+    tagFilter,
+  );
   const inboxObservation = inboxReturns.observe(workingShelfEnabled ? threads : null);
   const pinned: EnvironmentThreadShell[] = [];
   const active: EnvironmentThreadShell[] = [];
@@ -1081,6 +1100,32 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     setPersistedProjectScopeKeys(keys);
     scrollSidebarToTop(sidebarContentRef.current);
   };
+  const threadTagDefinitions = mergeThreadTagDefinitions(
+    connectedEnvironmentIds.map(
+      (environmentId) => serverConfigs.get(environmentId)?.settings.threadTagDefinitions ?? [],
+    ),
+  );
+  const persistedTagFilterNames = useUiStateStore((store) => store.sidebarTagFilterNames);
+  const setPersistedTagFilterNames = useUiStateStore((store) => store.setSidebarTagFilterNames);
+  const tagDefinitionsReady =
+    allProjectConfigsReady &&
+    connectedEnvironmentIds.length > 0 &&
+    connectedEnvironmentIds.length === serverConfigs.size &&
+    connectedEnvironmentIds.every((environmentId) => serverConfigs.has(environmentId));
+  const tagFilter = resolveSidebarTagFilter(
+    persistedTagFilterNames,
+    threadTagDefinitions,
+    tagDefinitionsReady,
+  );
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Remove deleted definitions from the persisted sidebar preference only after settings load.
+  useEffect(() => {
+    if (tagDefinitionsReady) setPersistedTagFilterNames(tagFilter ?? []);
+  }, [tagDefinitionsReady, tagFilter, setPersistedTagFilterNames]);
+  const setTagFilter = (names: readonly string[]) => {
+    clearSelection();
+    setPersistedTagFilterNames(names);
+    scrollSidebarToTop(sidebarContentRef.current);
+  };
   // A scope whose project is gone reads as all projects once every snapshot has
   // loaded. The stored keys are left alone, so the scope returns with its project.
   // An archived project's scope reads as all projects, matching the menu.
@@ -1188,9 +1233,11 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const scopedProjectGroups = revealWidensScope ? [] : chosenProjectGroups;
   const scopedProjectRefs = scopedProjectGroups.flatMap((project) => project.memberProjectRefs);
   const scopedProjectKeys = revealWidensScope ? null : chosenScopeProjectKeys;
+  // Tag terms filter loaded rows; the server searches messages for the rest.
+  const threadSearchTextQuery = parseThreadTagQuery(threadSearchQuery).text;
   const threadSearch = useThreadSearch(
     connectedEnvironmentIds,
-    threadSearchQuery,
+    threadSearchTextQuery,
     scopedProjectGroups.length === 0
       ? {}
       : { projectIds: scopedProjectRefs.map((projectRef) => projectRef.projectId) },
@@ -1336,6 +1383,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   } = useSidebarThreads({
     projectScopeKey,
     scopedProjectKeys,
+    tagFilter,
     serverConfigs,
     connectedEnvironmentIds,
     optimisticDrop,
@@ -1373,7 +1421,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             const thread = threadByMatchKey.get(threadSearchMatchKey(match));
             return thread ? threadSearchSubject(thread, null) : undefined;
           },
-          foldSearchQuery(threadSearchQuery),
+          foldSearchQuery(threadSearchTextQuery),
           // oxlint-disable-next-line react/purity -- Recency ranking samples the clock when the search matches change; the compiler recomputes it only then.
           Date.now(),
           // A list filter, as on mobile: a pick would move rows unexplained.
@@ -3194,6 +3242,13 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                   </ComboboxPopup>
                 </Combobox>
               }
+              tagFilter={
+                <SidebarTagFilterMenu
+                  definitions={threadTagDefinitions}
+                  selected={tagFilter ?? []}
+                  onSelectedChange={setTagFilter}
+                />
+              }
               onNewProject={openAddProjectCommandPalette}
               onNewThread={handleNewThreadClick}
               newThreadDisabled={projects.length === 0}
@@ -3219,6 +3274,13 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               activeSearchResultIndex={activeSearchResultIndex}
               onClearSearch={clearThreadSearch}
             />
+            {tagFilter === null ? null : (
+              <SidebarActiveTagFilter
+                definitions={threadTagDefinitions}
+                selected={tagFilter}
+                onClear={() => setTagFilter([])}
+              />
+            )}
           </SidebarGroup>
         }
       >

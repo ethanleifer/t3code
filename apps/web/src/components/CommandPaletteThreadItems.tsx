@@ -9,8 +9,10 @@ import {
 import {
   foldSearchQuery,
   PALETTE_MESSAGE_LIMIT,
+  parseThreadTagQuery,
   pickedQuery,
   rankMessageMatches,
+  threadHasTags,
 } from "@t3tools/shared/paletteSearch";
 import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
@@ -102,7 +104,9 @@ export function useCommandPaletteThreadItems(input: {
   const threads = useVisibleThreadShells();
   const { projectEnvironmentLocationById } = useEnvironmentLookups();
   const providerEntryByEnvironmentAndInstanceId = useProviderEntryByEnvironmentAndInstanceId();
-  const messageSearch = useConnectedThreadSearch(threadSearchQuery);
+  // Tag terms filter rows on the client; the server searches messages for the rest.
+  const { text: messageQuery, tags: queryTags } = parseThreadTagQuery(threadSearchQuery);
+  const messageSearch = useConnectedThreadSearch(messageQuery);
   const { projectByKey } = useProjectLookups();
   const visitThread = useAtomCommand(threadEnvironment.visit, { reportFailure: false });
   // Ranking is relative to when the palette opened, so rows do not reorder as time passes.
@@ -194,9 +198,11 @@ export function useCommandPaletteThreadItems(input: {
   const itemForMatch = (match: EnvironmentThreadSearchMatch) =>
     itemByValue.get(`thread:${match.environmentId}:${match.threadId}`);
   const rankedMessageItems = rankMessageMatches(
-    messageSearch.matches,
+    messageSearch.matches.filter((match) =>
+      threadHasTags(itemForMatch(match)?.threadSearch?.tags, queryTags),
+    ),
     (match) => itemForMatch(match)?.threadSearch,
-    foldSearchQuery(threadSearchQuery),
+    foldSearchQuery(messageQuery),
     now,
     { withoutTitleMatches: true },
   ).flatMap((match) => {
@@ -232,7 +238,7 @@ export function useCommandPaletteThreadItems(input: {
   const [shownOrder, setShownOrder] = useState<ShownOrder | null>(null);
   const order = nextShownOrder(
     shownOrder,
-    messageSearch.query,
+    threadSearchQuery,
     rankedMessageItems.map((item) => item.value),
     PALETTE_MESSAGE_LIMIT,
   );

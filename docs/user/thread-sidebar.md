@@ -232,6 +232,13 @@ On mobile, the thread list search also lists message matches and opens them at
 the matching message; on an iPad with a keyboard, `Cmd+K` opens the same
 palette.
 
+On web and desktop, use the tag filter beside the project filter to show threads
+carrying every selected tag. The selection survives reloads; clear it to show all
+threads again. Tag filters apply to loaded threads. You can also search with
+`tag:review` or `tag:"two words"` in the sidebar or command palette. Tag names
+match exactly, including case. Combine tag terms with other search words, such
+as `login tag:review`.
+
 Use **Settings → Keybindings** to find or customize shortcuts for searching files
 and copying a thread reference. A copied reference uses the thread's pull request
 link when available, otherwise a link to the thread, which opens it from anywhere

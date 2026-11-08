@@ -1,3 +1,4 @@
+import type { ThreadTagDefinition } from "@t3tools/contracts";
 import type { EnvironmentServerConfig } from "@t3tools/client-runtime/connection";
 import { scopeThreadRef, scopedThreadKey } from "@t3tools/client-runtime/environment";
 import { resolveThreadWorkingStartedAt } from "@t3tools/client-runtime/state/models";
@@ -15,7 +16,13 @@ import {
   threadSearchSubject,
   type ThreadSearchShell,
 } from "@t3tools/client-runtime/state/thread-search";
-import { foldSearchQuery, rankSearchItems, scoreThreadSearch } from "@t3tools/shared/paletteSearch";
+import {
+  foldSearchQuery,
+  parseThreadTagQuery,
+  rankSearchItems,
+  scoreThreadSearch,
+  threadHasTags,
+} from "@t3tools/shared/paletteSearch";
 import {
   isListedThreadLineage,
   type ContextMenuItem,
@@ -999,10 +1006,43 @@ export { sortPinnedThreadsByOrderKey as sortPinnedThreadsForSidebar } from "@t3t
 
 const EMPTY_CONTENT_MATCH_KEYS: ReadonlySet<string> = new Set<string>();
 
+/** One definition per name across environments; the first environment's color wins. */
+export function mergeThreadTagDefinitions(
+  definitionLists: ReadonlyArray<ReadonlyArray<ThreadTagDefinition>>,
+): ReadonlyArray<ThreadTagDefinition> {
+  const byName = new Map<string, ThreadTagDefinition>();
+  for (const definitions of definitionLists) {
+    for (const definition of definitions) {
+      if (!byName.has(definition.name)) byName.set(definition.name, definition);
+    }
+  }
+  return [...byName.values()];
+}
+
+/** The selected tags that are still defined, or null when no tag filters the list. */
+export function resolveSidebarTagFilter(
+  selected: readonly string[],
+  definitions: ReadonlyArray<{ readonly name: string }>,
+  definitionsReady: boolean,
+): readonly string[] | null {
+  const active = definitionsReady
+    ? selected.filter((name) => definitions.some((definition) => definition.name === name))
+    : selected;
+  return active.length === 0 ? null : active;
+}
+
+/** Threads that carry every tag; a null filter keeps them all. */
+export function filterSidebarThreadsByTags<
+  T extends { readonly tags?: readonly string[] | undefined },
+>(threads: readonly T[], tags: readonly string[] | null): readonly T[] {
+  return tags === null ? threads : threads.filter((thread) => threadHasTags(thread.tags, tags));
+}
+
 /**
  * Sidebar search results: title, branch, and pull request matches ranked as
  * the command palette ranks them, then threads listed only because their
- * messages match, in `contentMatchKeys` order.
+ * messages match, in `contentMatchKeys` order. `tag:` terms narrow both; a
+ * query of only tag terms lists every tagged thread in the given order.
  */
 export function searchSidebarThreads<
   T extends ThreadSearchShell & {
@@ -1010,13 +1050,18 @@ export function searchSidebarThreads<
     readonly id: ThreadId;
   },
 >(
-  threads: readonly T[],
+  allThreads: readonly T[],
   query: string,
   contentMatchKeys: ReadonlySet<string> = EMPTY_CONTENT_MATCH_KEYS,
   now = Date.now(),
 ): { readonly titleMatches: T[]; readonly contentMatches: T[] } {
-  const normalizedQuery = foldSearchQuery(query);
-  if (normalizedQuery.length === 0) return { titleMatches: [], contentMatches: [] };
+  const tagQuery = parseThreadTagQuery(query);
+  const threads =
+    tagQuery.tags.length === 0 ? allThreads : filterSidebarThreadsByTags(allThreads, tagQuery.tags);
+  const normalizedQuery = foldSearchQuery(tagQuery.text);
+  if (normalizedQuery.length === 0) {
+    return { titleMatches: tagQuery.tags.length === 0 ? [] : [...threads], contentMatches: [] };
+  }
   const titleMatches = rankSearchItems(threads, (thread, options) =>
     scoreThreadSearch(normalizedQuery, threadSearchSubject(thread, null), now, {
       ...options,

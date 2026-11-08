@@ -17,11 +17,19 @@ import { v2Projection, v2ThreadShell } from "./orchestrationV2TestFixtures.ts";
 import { deriveLatestThreadRun, deriveThreadRuntime } from "./threadExecution.ts";
 import { isThreadWorking } from "./threadInbox.ts";
 import { derivePendingThreadRequests } from "./threadRequests.ts";
+import { threadSearchSubject } from "./threadSearch.ts";
 import { canSnooze, effectiveSnoozed } from "./threadSettled.ts";
 
 const environmentId = EnvironmentId.make("environment-v2");
 
 describe("V2 client presentation", () => {
+  it("preserves exact and legacy tags through presentation and search", () => {
+    for (const tags of [undefined, [], ["review", "Review", "section:old", "two words"]]) {
+      const shell = presentThreadShell(environmentId, { ...v2ThreadShell, tags });
+      expect(threadSearchSubject(shell, null).tags).toEqual(tags ?? []);
+    }
+  });
+
   it("an async question allows snooze and wakes an older snooze", () => {
     const runId = RunId.make("run-async-question");
     const running = {
