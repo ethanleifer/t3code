@@ -404,19 +404,20 @@ describe("sidebar tag filter", () => {
     { name: "on hold", color: "#a1a1aa" },
   ];
 
-  it("groups a thread under every defined tag across statuses and keeps untagged threads", () => {
+  it("groups active threads under every defined tag and leaves settled threads out", () => {
     const both = { id: "both", tags: ["review", "on hold", "review"], status: "running" };
-    const settled = { id: "settled", tags: ["review"], status: "settled" };
+    const settled = { id: "settled", tags: ["review"], settledOverride: "settled" as const };
     const legacy = { id: "legacy", tags: ["section:old"] };
     const untagged = { id: "untagged", tags: undefined };
     const groups = groupSidebarThreadsByTag([both, settled, legacy, untagged], definitions);
     expect(groups.map((group) => [group.name, group.threads.map((thread) => thread.id)])).toEqual([
-      ["review", ["both", "settled"]],
+      ["review", ["both"]],
       ["on hold", ["both"]],
       ["Untagged", ["legacy", "untagged"]],
     ]);
     expect(groups[0]?.color).toBe("#3b82f6");
     expect(groupSidebarThreadsByTag([], definitions)).toEqual([]);
+    expect(groupSidebarThreadsByTag([settled, { ...settled, tags: [] }], definitions)).toEqual([]);
     const sameLabel = groupSidebarThreadsByTag(
       [{ tags: ["Untagged"] }, { tags: ["Review"] }],
       [{ name: "Untagged", color: "#123456" }],
