@@ -37,7 +37,16 @@ export const ThreadTagDefinition = Schema.Struct({
 });
 export type ThreadTagDefinition = typeof ThreadTagDefinition.Type;
 
-export const MAX_THREAD_TAG_DEFINITIONS = 100;
+const MAX_THREAD_TAG_DEFINITIONS = 100;
+
+export const ThreadTagDefinitions = Schema.Array(ThreadTagDefinition).check(
+  Schema.isMaxLength(MAX_THREAD_TAG_DEFINITIONS),
+  Schema.makeFilter((definitions) =>
+    new Set(definitions.map((definition) => definition.name)).size === definitions.length
+      ? true
+      : "Thread tag names must be unique.",
+  ),
+);
 
 const decodeThreadTagDefinition = Schema.decodeUnknownOption(ThreadTagDefinition);
 

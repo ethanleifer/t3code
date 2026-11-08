@@ -167,6 +167,14 @@ it("drops bad and repeated tag definitions and keeps the rest", () => {
   ]);
   expect(settings.hideTaggedThreads).toBe(true);
   expect(decodeServerSettings({}).threadTagDefinitions).toEqual([]);
+  expect(() =>
+    decodeServerSettingsPatch({
+      threadTagDefinitions: [
+        { name: "review", color: "blue" },
+        { name: "review", color: "green" },
+      ],
+    }),
+  ).toThrow();
 });
 
 describe("ServerSettings secret providers", () => {

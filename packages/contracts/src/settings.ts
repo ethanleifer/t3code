@@ -20,11 +20,7 @@ import {
   TrimmedNonEmptyString,
   TrimmedString,
 } from "./baseSchemas.ts";
-import {
-  MAX_THREAD_TAG_DEFINITIONS,
-  StoredThreadTagDefinitions,
-  ThreadTagDefinition,
-} from "./threadTags.ts";
+import { StoredThreadTagDefinitions, ThreadTagDefinitions } from "./threadTags.ts";
 import { UsageLimitSourceId } from "./usageLimitSourceId.ts";
 import { UsageModelFilter } from "./usage.ts";
 import { SecretProviderId, SecretProviderSlug } from "./secretReference.ts";
@@ -1759,9 +1755,7 @@ export const ServerSettingsPatch = Schema.Struct({
   snoozePresets: Schema.optionalKey(SnoozePresetSettings),
   hiddenThreadTags: Schema.optionalKey(Schema.Array(Schema.String)),
   hideTaggedThreads: Schema.optionalKey(Schema.Boolean),
-  threadTagDefinitions: Schema.optionalKey(
-    Schema.Array(ThreadTagDefinition).check(Schema.isMaxLength(MAX_THREAD_TAG_DEFINITIONS)),
-  ),
+  threadTagDefinitions: Schema.optionalKey(ThreadTagDefinitions),
   guestSharingEnabled: Schema.optionalKey(Schema.Boolean),
   linkedEnvironmentsEnabled: Schema.optionalKey(Schema.Boolean),
   backgroundActivity: Schema.optionalKey(
