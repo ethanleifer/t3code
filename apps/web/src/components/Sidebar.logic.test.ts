@@ -21,6 +21,7 @@ import {
   resolveSidebarTagFilter,
   filterSidebarThreadsByTags,
   mergeThreadTagDefinitions,
+  groupSidebarThreadsByTag,
   shouldRecedeSidebarThread,
   sortInboxThreadsByReturn,
   resolveSidebarDropTarget,
@@ -378,6 +379,27 @@ describe("sidebar tag filter", () => {
     { name: "review", color: "#3b82f6" },
     { name: "on hold", color: "#a1a1aa" },
   ];
+
+  it("groups a thread under every defined tag across statuses and keeps untagged threads", () => {
+    const both = { id: "both", tags: ["review", "on hold", "review"], status: "running" };
+    const settled = { id: "settled", tags: ["review"], status: "settled" };
+    const legacy = { id: "legacy", tags: ["section:old"] };
+    const untagged = { id: "untagged", tags: undefined };
+    const groups = groupSidebarThreadsByTag([both, settled, legacy, untagged], definitions);
+    expect(groups.map((group) => [group.name, group.threads.map((thread) => thread.id)])).toEqual([
+      ["review", ["both", "settled"]],
+      ["on hold", ["both"]],
+      ["Untagged", ["legacy", "untagged"]],
+    ]);
+    expect(groups[0]?.color).toBe("#3b82f6");
+    expect(groupSidebarThreadsByTag([], definitions)).toEqual([]);
+    const sameLabel = groupSidebarThreadsByTag(
+      [{ tags: ["Untagged"] }, { tags: ["Review"] }],
+      [{ name: "Untagged", color: "#123456" }],
+    );
+    expect(new Set(sameLabel.map((group) => group.id)).size).toBe(2);
+    expect(sameLabel[1]?.threads).toEqual([{ tags: ["Review"] }]);
+  });
 
   it("merges definitions by exact name and keeps the first environment's hex color", () => {
     expect(

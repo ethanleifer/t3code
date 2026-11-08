@@ -1006,6 +1006,35 @@ export { sortPinnedThreadsByOrderKey as sortPinnedThreadsForSidebar } from "@t3t
 
 const EMPTY_CONTENT_MATCH_KEYS: ReadonlySet<string> = new Set<string>();
 
+export function groupSidebarThreadsByTag<
+  T extends { readonly tags?: readonly string[] | undefined },
+>(threads: readonly T[], definitions: readonly ThreadTagDefinition[]) {
+  const groups = definitions.map((definition) => ({
+    id: `tag-group:${JSON.stringify(definition.name)}`,
+    name: definition.name,
+    color: definition.color,
+    threads: new Array<T>(),
+  }));
+  const byName = new Map(groups.map((group) => [group.name, group]));
+  const untagged = {
+    id: "tag-group:untagged",
+    name: "Untagged",
+    color: null,
+    threads: new Array<T>(),
+  };
+  for (const thread of threads) {
+    let grouped = false;
+    for (const tag of new Set(thread.tags)) {
+      const group = byName.get(tag);
+      if (group === undefined) continue;
+      group.threads.push(thread);
+      grouped = true;
+    }
+    if (!grouped) untagged.threads.push(thread);
+  }
+  return [...groups, untagged].filter((group) => group.threads.length > 0);
+}
+
 /** One definition per name across environments; the first environment's color wins. */
 export function mergeThreadTagDefinitions(
   definitionLists: ReadonlyArray<ReadonlyArray<ThreadTagDefinition>>,

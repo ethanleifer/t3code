@@ -248,6 +248,12 @@ threads again. Tag filters apply to loaded threads. You can also search with
 match exactly, including case. Combine tag terms with other search words, such
 as `login tag:review`.
 
+To organize the web or desktop sidebar by tag, open the tag menu and choose
+**Group by → Tag**. A thread appears under each of its defined tags, regardless
+of status. Threads without a defined tag appear under **Untagged**. Grouping and
+collapsed groups survive reloads. Choose **Status** to return to the status shelves.
+Tag groups show loaded threads, including loaded settled and snoozed threads.
+
 Use **Settings → Keybindings** to find or customize shortcuts for searching files
 and copying a thread reference. A copied reference uses the thread's pull request
 link when available, otherwise a link to the thread, which opens it from anywhere
