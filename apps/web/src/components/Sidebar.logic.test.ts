@@ -23,6 +23,7 @@ import {
   scopeSidebarProjectsToMachine,
   mergeThreadTagDefinitions,
   groupSidebarThreadsByTag,
+  sortSidebarGroupThreads,
   shouldRecedeSidebarThread,
   sortInboxThreadsByReturn,
   resolveSidebarDropTarget,
@@ -424,6 +425,61 @@ describe("sidebar tag filter", () => {
     );
     expect(new Set(sameLabel.map((group) => group.id)).size).toBe(2);
     expect(sameLabel[1]?.threads).toEqual([{ tags: ["Review"] }]);
+  });
+
+  it("keeps pins first in every tag group, then sorts by status or activity", () => {
+    const pinned = makeThread({
+      id: ThreadId.make("pinned"),
+      pinnedAt: "2026-01-01T00:00:00.000Z",
+      tags: ["review", "on hold"],
+    });
+    const waiting = makeThread({
+      id: ThreadId.make("waiting"),
+      tags: ["review"],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+      runtime: {
+        status: "idle",
+        activeRunId: null,
+        providerInstanceId: ProviderInstanceId.make("codex"),
+        providerName: "codex",
+        updatedAt: "2026-03-03T00:00:00.000Z",
+        lastError: null,
+        lastErrorClass: null,
+      },
+    });
+    const input = makeThread({
+      id: ThreadId.make("input"),
+      tags: ["review", "on hold"],
+      updatedAt: "2026-03-01T00:00:00.000Z",
+      hasPendingUserInput: true,
+    });
+    const ready = makeThread({
+      id: ThreadId.make("ready"),
+      tags: ["review"],
+      updatedAt: "2026-03-02T00:00:00.000Z",
+    });
+    const threads = [waiting, ready, input, pinned];
+    const status = groupSidebarThreadsByTag(
+      sortSidebarGroupThreads(threads, "status"),
+      definitions,
+    );
+    expect(status.map((group) => group.threads.map((thread) => thread.id))).toEqual([
+      ["pinned", "input", "ready", "waiting"],
+      ["pinned", "input"],
+    ]);
+    expect(sortSidebarGroupThreads(threads, "activity").map((thread) => thread.id)).toEqual([
+      "pinned",
+      "waiting",
+      "ready",
+      "input",
+    ]);
+    expect(threads.map((thread) => thread.id)).toEqual(["waiting", "ready", "input", "pinned"]);
+    expect(
+      sortSidebarGroupThreads(
+        [pinned, { ...pinned, id: ThreadId.make("second-pin"), pinOrderKey: "a0" }],
+        "status",
+      ).map((thread) => thread.id),
+    ).toEqual(["second-pin", "pinned"]);
   });
 
   it("merges definitions by exact name and keeps the first environment's hex color", () => {
