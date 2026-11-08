@@ -81,6 +81,7 @@ import * as RuntimeLayer from "./runtimeLayer.ts";
 import { shellStreamItemFromThreadShell } from "./ShellStream.ts";
 import { CodexProviderCapabilitiesV2 } from "./Adapters/CodexAdapterV2.ts";
 import * as ThreadManagementService from "./ThreadManagementService.ts";
+import * as ThreadTagDefinitionCleanup from "./ThreadTagDefinitionCleanup.ts";
 import * as ManagedProjectFolders from "../project/ManagedProjectFolders.ts";
 import * as ScratchThreadPromotion from "../project/ScratchThreadPromotion.ts";
 import * as ScheduledTaskService from "../scheduledTasks/ScheduledTaskService.ts";
@@ -2808,6 +2809,79 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
       assert.isNotNull(projection.thread.archivedAt);
       assert.isNotNull(projection.thread.deletedAt);
     }),
+  );
+
+  it.effect("deleting a tag definition untags live and archived threads, and only that tag", () =>
+    Effect.gen(function* () {
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const projectId = ProjectId.make("runtime-layer-tag-definition-project");
+      yield* seedProject({
+        projectId,
+        title: "Tag definition project",
+        workspaceRoot: "/workspace/tag-definitions",
+        defaultModelSelection: null,
+        createdAt: "2026-09-07T00:00:00.000Z",
+      });
+      const threadIds = ["live", "archived"].map((name) =>
+        ThreadId.make(`runtime-layer-tag-definition-${name}`),
+      );
+      for (const threadId of threadIds) {
+        yield* orchestrator.dispatch({
+          type: "thread.create",
+          createdBy: "user",
+          creationSource: "web",
+          commandId: CommandId.make(`${threadId}:create`),
+          threadId,
+          projectId,
+          title: "Tagged thread",
+          modelSelection,
+          runtimeMode: "full-access",
+          interactionMode: "default",
+          branch: null,
+          worktreePath: null,
+        });
+        for (const tag of ["doomed", "kept", "section:inbox"]) {
+          yield* orchestrator.dispatch({
+            type: "thread.tag.set",
+            commandId: CommandId.make(`${threadId}:tag:${tag}`),
+            threadId,
+            tag,
+            tagged: true,
+          });
+        }
+      }
+      yield* orchestrator.dispatch({
+        type: "thread.archive",
+        commandId: CommandId.make("runtime-layer-tag-definition-archive"),
+        threadId: threadIds[1]!,
+      });
+
+      const kept = { name: "kept", color: "blue" } as const;
+      const settings = yield* Effect.provide(
+        ServerSettings.ServerSettingsService,
+        ServerSettings.layerTest({
+          threadTagDefinitions: [{ name: "doomed", color: "red" }, kept],
+        }),
+      );
+      const current = yield* settings.getSettings;
+      const cleanup = yield* ThreadTagDefinitionCleanup.make.pipe(
+        Effect.provideService(ServerSettings.ServerSettingsService, {
+          ...settings,
+          subscribeChanges: Effect.succeed(
+            Stream.make({ ...current, threadTagDefinitions: [kept] }),
+          ),
+        }),
+        Effect.provide(NodeCrypto.layer),
+      );
+      yield* Fiber.join(yield* cleanup.start());
+
+      for (const threadId of threadIds) {
+        assert.deepEqual((yield* orchestrator.getThreadProjection(threadId)).thread.tags, [
+          "kept",
+          "section:inbox",
+        ]);
+      }
+    }).pipe(Effect.scoped),
   );
 
   it.effect("keeps the branch pull request when linking another pull request", () =>

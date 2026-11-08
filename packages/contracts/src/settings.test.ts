@@ -149,6 +149,34 @@ it("drops a hand-edited non-string hidden tag and keeps the rest of the settings
   expect(settings.hideTaggedThreads).toBe(true);
 });
 
+it("drops bad and repeated tag definitions and keeps the rest", () => {
+  const settings = decodeServerSettings({
+    threadTagDefinitions: [
+      { name: "review", color: "blue" },
+      { name: "  ", color: "red" },
+      { name: "urgent", color: "teal" },
+      "loose",
+      { name: "review", color: "green" },
+      { name: "Review", color: "pink" },
+    ],
+    hideTaggedThreads: true,
+  });
+  expect(settings.threadTagDefinitions).toEqual([
+    { name: "review", color: "blue" },
+    { name: "Review", color: "pink" },
+  ]);
+  expect(settings.hideTaggedThreads).toBe(true);
+  expect(decodeServerSettings({}).threadTagDefinitions).toEqual([]);
+  expect(() =>
+    decodeServerSettingsPatch({
+      threadTagDefinitions: [
+        { name: "review", color: "blue" },
+        { name: "review", color: "green" },
+      ],
+    }),
+  ).toThrow();
+});
+
 describe("ServerSettings secret providers", () => {
   const onePassword = (account: string) => ({
     kind: "one_password",
