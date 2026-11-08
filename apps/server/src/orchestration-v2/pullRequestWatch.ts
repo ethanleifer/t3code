@@ -39,6 +39,7 @@ export function evaluatePullRequestWatch(
   >,
   remarks: ReadonlyArray<PullRequestComment> | null,
   now: number,
+  ignoreBots = false,
 ): PullRequestWatchReport {
   const changes: Array<PullRequestWatchChange> = [];
   // Azure DevOps omits the head when its iteration read fails; that is not a push.
@@ -118,7 +119,9 @@ export function evaluatePullRequestWatch(
       remark.author?.login.toLowerCase() !== own
     );
   });
-  if (fresh.length > 0) changes.push({ kind: "remarks", remarks: fresh });
+  // Ignored remarks still advance the watermark, so lifting the filter does not replay them.
+  const heard = ignoreBots ? fresh.filter((remark) => remark.author?.isBot !== true) : fresh;
+  if (heard.length > 0) changes.push({ kind: "remarks", remarks: heard });
   const latest = Math.max(through, ...fresh.map((remark) => Date.parse(activeAt(remark))));
   const atLatest = fresh.filter((remark) => Date.parse(activeAt(remark)) === latest);
   const remarksThrough = latest === through ? watch.remarksThrough : activeAt(atLatest[0]!);

@@ -13,8 +13,11 @@ import {
 
 // These cases read the head once or at one moment, so the no-checks notice never comes due.
 const evaluatePullRequestWatch = (
-  ...args: Parameters<typeof evaluate> extends [...infer Head, number] ? Head : never
-) => evaluate(...args, 0);
+  current: Parameters<typeof evaluate>[0],
+  read: Parameters<typeof evaluate>[1],
+  remarks: Parameters<typeof evaluate>[2],
+  ignoreBots?: boolean,
+) => evaluate(current, read, remarks, 0, ignoreBots);
 
 const STARTED = "2026-10-02T12:00:00.000Z";
 
@@ -334,6 +337,22 @@ describe("evaluatePullRequestWatch", () => {
     assert.deepEqual(report.changes, [{ kind: "remarks", remarks: [comments[1]!] }]);
     assert.equal(report.next.remarksThrough, "2026-10-02T12:06:00Z");
     assert.deepEqual(evaluatePullRequestWatch(report.next, detail(), comments).changes, []);
+  });
+
+  it("passes over bot remarks when ignoring bots, and never replays them later", () => {
+    const bot = remark("coderabbitai", "2026-10-02T12:06:00Z");
+    const flagged = { ...bot, author: { ...bot.author!, isBot: true } };
+    const human = remark("reviewer", "2026-10-02T12:05:00Z");
+    const report = evaluatePullRequestWatch(watch(), detail(), [human, flagged], true);
+    assert.deepEqual(report.changes, [{ kind: "remarks", remarks: [human] }]);
+    assert.equal(report.next.remarksThrough, "2026-10-02T12:06:00Z");
+    assert.deepEqual(evaluatePullRequestWatch(report.next, detail(), [human, flagged]).changes, []);
+    const quiet = evaluatePullRequestWatch(watch(), detail(), [flagged], true);
+    assert.deepEqual(quiet.changes, []);
+    assert.equal(quiet.next.wakes, 0);
+    assert.deepEqual(evaluatePullRequestWatch(watch(), detail(), [flagged]).changes, [
+      { kind: "remarks", remarks: [flagged] },
+    ]);
   });
 
   it("cuts a long remark in the wake message without splitting an emoji", () => {
