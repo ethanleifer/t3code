@@ -1,5 +1,7 @@
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
+import * as SchemaTransformation from "effect/SchemaTransformation";
 
 import { TrimmedNonEmptyString } from "./baseSchemas.ts";
 
@@ -15,4 +17,48 @@ export type ThreadTag = typeof ThreadTag.Type;
 /** Tags read back from storage or a peer. Lenient so a later tag rule never fails a whole thread. */
 export const StoredThreadTags = Schema.Array(Schema.String).pipe(
   Schema.catchDecoding(() => Effect.succeedSome([])),
+);
+
+export const ThreadTagColor = Schema.Literals([
+  "gray",
+  "red",
+  "orange",
+  "yellow",
+  "green",
+  "blue",
+  "purple",
+  "pink",
+]);
+export type ThreadTagColor = typeof ThreadTagColor.Type;
+
+export const ThreadTagDefinition = Schema.Struct({
+  name: ThreadTag,
+  color: ThreadTagColor,
+});
+export type ThreadTagDefinition = typeof ThreadTagDefinition.Type;
+
+export const MAX_THREAD_TAG_DEFINITIONS = 100;
+
+const decodeThreadTagDefinition = Schema.decodeUnknownOption(ThreadTagDefinition);
+
+/** Bad entries and repeated names drop alone, so a hand edit cannot reset settings. */
+export const StoredThreadTagDefinitions = Schema.Array(Schema.Unknown).pipe(
+  Schema.decodeTo(
+    Schema.Array(ThreadTagDefinition),
+    SchemaTransformation.transform<ReadonlyArray<ThreadTagDefinition>, ReadonlyArray<unknown>>({
+      decode: (values) => {
+        const names = new Set<string>();
+        const definitions: Array<ThreadTagDefinition> = [];
+        for (const value of values) {
+          const definition = Option.getOrUndefined(decodeThreadTagDefinition(value));
+          if (definition === undefined || names.has(definition.name)) continue;
+          names.add(definition.name);
+          definitions.push(definition);
+          if (definitions.length === MAX_THREAD_TAG_DEFINITIONS) break;
+        }
+        return definitions;
+      },
+      encode: (definitions) => definitions,
+    }),
+  ),
 );

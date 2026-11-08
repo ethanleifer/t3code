@@ -9,6 +9,7 @@ import type {
   OrchestrationV2SearchThreadInput,
   OrchestrationV2SearchThreadResult,
   OrchestrationV2ThreadHistoryPage,
+  ThreadTag,
 } from "@t3tools/contracts";
 import {
   latestRootProviderFailure,
@@ -561,6 +562,10 @@ export interface ProjectionStoreV2Shape {
   readonly getThreadsWithPullRequests: (
     threadId?: ThreadId,
   ) => Effect.Effect<ReadonlyArray<ProjectionThreadPullRequests>, ProjectionStoreV2Error>;
+  /** Threads carrying this tag that are not deleted, archived ones included. */
+  readonly listTaggedThreadIds: (
+    tag: ThreadTag,
+  ) => Effect.Effect<ReadonlyArray<ThreadId>, ProjectionStoreV2Error>;
   /** Titles of the given threads that exist, archived ones included. */
   readonly getThreadTitles: (
     threadIds: ReadonlyArray<ThreadId>,
@@ -7318,6 +7323,17 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
       return Object.fromEntries(rows.map((row) => [row.thread_id, row.title]));
     }, Effect.mapError(shellSnapshotReadError));
 
+    const listTaggedThreadIds = Effect.fn("ProjectionStore.listTaggedThreadIds")(function* (
+      tag: ThreadTag,
+    ) {
+      const rows = yield* sql<{ readonly thread_id: ThreadId }>`
+        SELECT t.thread_id
+        FROM orchestration_v2_projection_threads t, json_each(t.payload_json, '$.tags') tag
+        WHERE t.deleted_at IS NULL AND tag.value = ${tag}
+      `;
+      return rows.map((row) => row.thread_id);
+    }, Effect.mapError(shellSnapshotReadError));
+
     const findGuestShareThreadId = Effect.fn("ProjectionStore.findGuestShareThreadId")(function* (
       shareId: GuestShareId,
     ) {
@@ -7484,6 +7500,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
       getThread: readOnReader(getThread),
       getSettlementCandidates: readOnReader(getSettlementCandidates),
       getThreadsWithPullRequests: readOnReader(getThreadsWithPullRequests),
+      listTaggedThreadIds: readOnReader(listTaggedThreadIds),
       getThreadTitles: readOnReader(getThreadTitles),
       getThreadWorktreePaths: readOnReader(getThreadWorktreePaths),
       getOpenRemoteDelegatedTasks: getOpenRemoteDelegatedTasks.pipe(NodeSqliteClient.readOnly),
