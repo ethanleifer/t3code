@@ -1094,7 +1094,7 @@ export function groupSidebarThreadsByTag<
     }
     if (!grouped) untagged.threads.push(thread);
   }
-  return [...groups, untagged].filter((group) => group.threads.length > 0);
+  return [untagged, ...groups].filter((group) => group.threads.length > 0);
 }
 
 /** One definition per name across environments; the first environment's color wins. */
