@@ -216,6 +216,8 @@ import {
   sidebarThreadKeyAtY,
   sortInboxThreadsByReturn,
   sortPinnedThreadsForSidebar,
+  sortSidebarGroupThreads,
+  type SidebarGroupSort,
   sortThreadsForSidebar,
   sortWorkingThreadsBySend,
   useSnoozeWakeClock,
@@ -348,6 +350,7 @@ const SETTLED_TAIL_PAGE_COUNT = 25;
 const SETTLED_SHELF_EXPANDED_KEY = "t3code:sidebar:settled-expanded";
 const SNOOZED_SHELF_EXPANDED_KEY = "t3code:sidebar:snoozed-expanded";
 const WORKING_SHELF_EXPANDED_KEY = "t3code:sidebar:working-expanded";
+const SIDEBAR_GROUP_SORT_SCHEMA = Schema.Literals(["status", "activity"]);
 const SIDEBAR_GROUPING_SCHEMA = Schema.Literals(["status", "tag"]);
 const COLLAPSED_TAG_GROUPS_SCHEMA = Schema.Array(Schema.String);
 const MACHINE_FILTER_SCHEMA = Schema.NullOr(EnvironmentId);
@@ -441,6 +444,7 @@ function useSidebarThreads(input: {
   readonly scopedProjectKeys: ReadonlySet<string> | null;
   readonly tagFilter: readonly string[] | null;
   readonly grouping: SidebarGrouping;
+  readonly sorting: SidebarGroupSort;
   readonly tagDefinitions: readonly ThreadTagDefinition[];
   readonly collapsedTagGroups: readonly string[];
   readonly serverConfigs: ReadonlyMap<EnvironmentId, EnvironmentServerConfig>;
@@ -520,8 +524,11 @@ function useSidebarThreads(input: {
     clockKey: `${nowMinute}:${snoozeWakeClock}:${inboxReturnsVersion}`,
   });
 
-  const { pinnedThreads, activeThreads, workingThreads, snoozedThreads, settledThreads } =
-    partition;
+  const pinnedThreads = partition.pinnedThreads;
+  const activeThreads = sortSidebarGroupThreads(partition.activeThreads, input.sorting);
+  const workingThreads = sortSidebarGroupThreads(partition.workingThreads, input.sorting);
+  const snoozedThreads = sortSidebarGroupThreads(partition.snoozedThreads, input.sorting);
+  const settledThreads = sortSidebarGroupThreads(partition.settledThreads, input.sorting);
   // Older settled threads load in pages; the shelf lists them only as far as they are loaded.
   const olderSettledShelf = useOlderSettledShelf({
     scopes: olderSettledScopes([...serverConfigs.keys()], scopedProjectKeys),
@@ -579,7 +586,7 @@ function useSidebarThreads(input: {
   const tagGroups =
     input.grouping === "tag"
       ? groupSidebarThreadsByTag(
-          sortWorkingThreadsBySend(partition.visibleThreads),
+          sortSidebarGroupThreads(partition.visibleThreads, input.sorting),
           input.tagDefinitions,
         ).map((group) => {
           const collapsed = input.collapsedTagGroups.includes(group.id);
@@ -615,6 +622,10 @@ function useSidebarThreads(input: {
   }
   return {
     ...partition,
+    activeThreads,
+    workingThreads,
+    snoozedThreads,
+    settledThreads,
     threads,
     workingShelfEnabled,
     searchableThreads: [
@@ -1156,6 +1167,11 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     "status",
     SIDEBAR_GROUPING_SCHEMA,
   );
+  const [sidebarGroupSort, setSidebarGroupSort] = useLocalStorage(
+    "t3code:sidebar:group-sort",
+    "status",
+    SIDEBAR_GROUP_SORT_SCHEMA,
+  );
   const [collapsedTagGroups, setCollapsedTagGroups] = useLocalStorage(
     "t3code:sidebar:collapsed-tag-groups",
     EMPTY_TAG_GROUPS,
@@ -1455,6 +1471,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     scopedProjectKeys,
     tagFilter,
     grouping: sidebarGrouping,
+    sorting: sidebarGroupSort,
     tagDefinitions: threadTagDefinitions,
     collapsedTagGroups,
     serverConfigs,
@@ -3419,6 +3436,12 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                   selected={tagFilter ?? []}
                   onSelectedChange={setTagFilter}
                   grouping={sidebarGrouping}
+                  sorting={sidebarGroupSort}
+                  onSortingChange={(sorting) => {
+                    clearSelection();
+                    setSidebarGroupSort(sorting);
+                    scrollSidebarToTop(sidebarContentRef.current);
+                  }}
                   onGroupingChange={(grouping) => {
                     clearSelection();
                     setSidebarGrouping(grouping);
@@ -3599,6 +3622,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                             sortableDisabled={
                               projectFolders !== null ||
                               tagGroups !== null ||
+                              section !== "pinned" ||
                               renamingThreadKey === threadKey ||
                               !draggableThreadKeys.has(threadKey) ||
                               optimisticDrop !== null

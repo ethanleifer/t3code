@@ -1,6 +1,7 @@
 import type { ThreadTagColor, ThreadTagDefinition } from "@t3tools/contracts";
 import { TagIcon, XIcon } from "lucide-react";
 
+import type { SidebarGroupSort } from "../Sidebar.logic";
 import { cn } from "~/lib/utils";
 import { Button } from "../ui/button";
 import { CollapsibleSectionHeader } from "../ui/collapsible-section-header";
@@ -42,10 +43,14 @@ export function SidebarTagFilterMenu({
   onSelectedChange,
   grouping,
   onGroupingChange,
+  sorting,
+  onSortingChange,
 }: {
   definitions: ReadonlyArray<ThreadTagDefinition>;
   selected: readonly string[];
   onSelectedChange: (names: readonly string[]) => void;
+  sorting: SidebarGroupSort;
+  onSortingChange: (sorting: SidebarGroupSort) => void;
   grouping: SidebarGrouping;
   onGroupingChange: (grouping: SidebarGrouping) => void;
 }) {
@@ -90,6 +95,19 @@ export function SidebarTagFilterMenu({
           >
             <MenuRadioItem value="status">Status</MenuRadioItem>
             <MenuRadioItem value="tag">Tag</MenuRadioItem>
+          </MenuRadioGroup>
+        </MenuGroup>
+        <MenuSeparator />
+        <MenuGroup>
+          <MenuGroupLabel>Sort within groups · pinned first</MenuGroupLabel>
+          <MenuRadioGroup
+            value={sorting}
+            onValueChange={(value) => {
+              if (value === "status" || value === "activity") onSortingChange(value);
+            }}
+          >
+            <MenuRadioItem value="status">Status</MenuRadioItem>
+            <MenuRadioItem value="activity">Recent activity</MenuRadioItem>
           </MenuRadioGroup>
         </MenuGroup>
         {definitions.length > 0 ? <MenuSeparator /> : null}

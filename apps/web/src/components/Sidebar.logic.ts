@@ -37,6 +37,8 @@ import {
 } from "@t3tools/client-runtime/state/thread-settled";
 import {
   getThreadSortTimestamp,
+  resolveThreadActivityTimestamp,
+  sortPinnedThreadsByOrderKey,
   planPinnedReorder,
   sortThreads,
   toSortableTimestamp,
@@ -1020,6 +1022,45 @@ export {
 
 export { pinOrderKeyBetween } from "@t3tools/client-runtime/state/thread-sort";
 export { sortPinnedThreadsByOrderKey as sortPinnedThreadsForSidebar } from "@t3tools/client-runtime/state/thread-sort";
+
+export type SidebarGroupSort = "status" | "activity";
+
+const SIDEBAR_STATUS_ORDER = {
+  approval: 0,
+  input: 1,
+  request: 2,
+  failed: 3,
+  limited: 4,
+  ready: 5,
+  preparing: 6,
+  working: 7,
+  waiting: 8,
+} satisfies Record<SidebarThreadStatus, number>;
+
+export function sortSidebarGroupThreads<T extends SidebarThreadSummary>(
+  threads: readonly T[],
+  sorting: SidebarGroupSort,
+): T[] {
+  const pinned = threads.filter((thread) => thread.pinnedAt != null);
+  const unpinned = threads.filter((thread) => thread.pinnedAt == null);
+  const ordered = unpinned
+    .map((thread) => ({
+      thread,
+      status:
+        thread.settledOverride === "settled"
+          ? 9
+          : SIDEBAR_STATUS_ORDER[resolveSidebarThreadStatus(thread)],
+      activity: toSortableTimestamp(resolveThreadActivityTimestamp(thread) ?? undefined) ?? 0,
+    }))
+    .sort(
+      (left, right) =>
+        (sorting === "status" ? left.status - right.status : 0) ||
+        right.activity - left.activity ||
+        left.thread.id.localeCompare(right.thread.id) ||
+        left.thread.environmentId.localeCompare(right.thread.environmentId),
+    );
+  return [...sortPinnedThreadsByOrderKey(pinned), ...ordered.map(({ thread }) => thread)];
+}
 
 const EMPTY_CONTENT_MATCH_KEYS: ReadonlySet<string> = new Set<string>();
 
