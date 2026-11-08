@@ -1024,7 +1024,10 @@ export { sortPinnedThreadsByOrderKey as sortPinnedThreadsForSidebar } from "@t3t
 const EMPTY_CONTENT_MATCH_KEYS: ReadonlySet<string> = new Set<string>();
 
 export function groupSidebarThreadsByTag<
-  T extends { readonly tags?: readonly string[] | undefined },
+  T extends {
+    readonly tags?: readonly string[] | undefined;
+    readonly settledOverride?: SidebarThreadSummary["settledOverride"] | undefined;
+  },
 >(threads: readonly T[], definitions: readonly ThreadTagDefinition[]) {
   const groups = definitions.map((definition) => ({
     id: `tag-group:${JSON.stringify(definition.name)}`,
@@ -1040,6 +1043,7 @@ export function groupSidebarThreadsByTag<
     threads: new Array<T>(),
   };
   for (const thread of threads) {
+    if (thread.settledOverride === "settled") continue;
     let grouped = false;
     for (const tag of new Set(thread.tags)) {
       const group = byName.get(tag);
