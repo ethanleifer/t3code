@@ -154,6 +154,8 @@ import {
 import { environmentPresentations } from "../state/presentation";
 import { primaryServerKeybindingsAtom } from "../state/server";
 import { environmentProjects } from "../state/projects";
+import { buildThreadTagMenu, threadTagAction } from "./threadTagMenu";
+import { useSetThreadTag } from "../hooks/useSetThreadTag";
 import { threadEnvironment } from "../state/threads";
 import { useOlderSettledShelf, useOlderSettledShelfGrowth } from "../state/olderSettledShelf";
 import { useThreadSearch } from "../state/queries";
@@ -915,6 +917,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   } = useSidebarLookups();
   const delegatedUnderParent = useDelegatedUnderParent();
   const router = useRouter();
+  const setThreadTag = useSetThreadTag();
   const { isMobile, setOpenMobile } = useSidebar();
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const confirmThreadDelete = useClientSettings((s) => s.confirmThreadDelete);
@@ -2287,6 +2290,15 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         const thread = threadByKeyRef.current.get(threadKey);
         return thread ? [thread] : [];
       });
+      const tagMenu = buildThreadTagMenu(
+        selectedThreads.map((thread) => ({
+          definitions: serverConfigs.get(thread.environmentId)?.settings.threadTagDefinitions ?? [],
+          tags: thread.source.tags ?? [],
+          canTag: appAtomRegistry.get(
+            threadEnvironment.setTag.permissionAtom(thread.environmentId),
+          ),
+        })),
+      );
       const settlingThreads = selectedThreads.filter(
         (thread) => thread.settledOverride !== "settled",
       );
@@ -2322,6 +2334,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       const clicked = await settlePromise(() =>
         api.contextMenu.show(
           [
+            tagMenu,
             ...(unpinMenuItem
               ? [{ ...unpinMenuItem, disabled: !canOperateThreads(pinnedSelectedThreads) }]
               : []),
@@ -2374,6 +2387,26 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         ),
       );
       if (clicked._tag === "Failure" || clicked.value === null) return;
+      if (clicked.value === "manage-tags") {
+        void router.navigate({
+          to: "/settings/tags",
+          search: { machine: selectedThreads[0]!.environmentId },
+        });
+        return;
+      }
+      const tagAction = threadTagAction(clicked.value);
+      if (tagAction) {
+        if (!checkThreadOperations(selectedThreads)) return;
+        for (const thread of selectedThreads) {
+          const result = await setThreadTag(
+            scopeThreadRef(thread.environmentId, thread.id),
+            tagAction,
+          );
+          if (result._tag === "Failure") return;
+        }
+        clearSelection();
+        return;
+      }
       const actionTargets =
         clicked.value === "unpin"
           ? pinnedSelectedThreads
@@ -2622,6 +2655,16 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         const clicked = await settlePromise(() =>
           api.contextMenu.show(
             buildThreadActionMenuItems({
+              tagMenu: buildThreadTagMenu([
+                {
+                  definitions:
+                    serverConfigs.get(thread.environmentId)?.settings.threadTagDefinitions ?? [],
+                  tags: thread.source.tags ?? [],
+                  canTag: appAtomRegistry.get(
+                    threadEnvironment.setTag.permissionAtom(thread.environmentId),
+                  ),
+                },
+              ]),
               canOperate: readEnvironmentScope(
                 threadRef.environmentId,
                 AuthOrchestrationOperateScope,
@@ -2659,6 +2702,15 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           ),
         );
         if (clicked._tag === "Failure" || clicked.value === null) return;
+        if (clicked.value === "manage-tags") {
+          void router.navigate({ to: "/settings/tags", search: { machine: thread.environmentId } });
+          return;
+        }
+        const tagAction = threadTagAction(clicked.value);
+        if (tagAction) {
+          await setThreadTag(threadRef, tagAction);
+          return;
+        }
         if (threadActionRequiresOperate(clicked.value) && !checkThreadOperations([thread])) return;
         if (clicked.value?.startsWith("snooze:")) {
           const preset =

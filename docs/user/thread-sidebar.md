@@ -3,6 +3,15 @@
 Use a new thread for a separate task. Choose **New worktree** when its code changes
 need a separate branch and working directory.
 
+## Organize threads with tags
+
+On web and desktop, open **Settings → Tags** and select an environment to create tags or change
+their colors. Tag names are case-sensitive. Choose a preset color or use a custom color.
+
+Apply or remove tags from a thread's **Tags** menu in the sidebar or chat header. Select several
+threads to change their tags together. Across environments, the menu offers tags defined on every
+selected environment. Deleting a definition removes that tag from all threads in its environment.
+
 ## Start a thread
 
 On web and desktop, **New thread** opens the project picker when you have multiple

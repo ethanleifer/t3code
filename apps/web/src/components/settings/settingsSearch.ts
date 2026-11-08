@@ -26,6 +26,7 @@ export type SettingsPath =
   | "/settings/keybindings"
   | "/settings/snap-shot"
   | "/settings/providers"
+  | "/settings/tags"
   | "/settings/threads"
   | "/settings/browser"
   | "/settings/devices"
@@ -94,6 +95,7 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/keybindings": "Keybindings",
   "/settings/snap-shot": "SnapShots",
   "/settings/providers": "Providers",
+  "/settings/tags": "Tags",
   "/settings/threads": "Threads",
   "/settings/browser": "Browser",
   "/settings/devices": "Devices",
@@ -132,6 +134,7 @@ export const SETTINGS_NAV_GROUPS: ReadonlyArray<{
     paths: [
       "/settings/providers",
       "/settings/threads",
+      "/settings/tags",
       "/settings/browser",
       "/settings/devices",
       "/settings/scheduled-tasks",
@@ -427,6 +430,13 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "Project order",
     to: "/settings/general",
     searchTerms: ["sort projects sidebar manual created recent"],
+  },
+  {
+    id: "thread-tags",
+    title: "Tags",
+    to: "/settings/tags",
+    scope: "environment",
+    searchTerms: ["labels tags colors create delete organize"],
   },
   {
     id: "snooze-options",
@@ -1314,6 +1324,7 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/snap-shot": null,
   "/settings/keybindings": null,
   "/settings/providers": null,
+  "/settings/tags": "environment",
   "/settings/threads": null,
   "/settings/browser": null,
   "/settings/devices": null,

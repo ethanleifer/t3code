@@ -5,6 +5,8 @@ import * as Option from "effect/Option";
 import { Atom } from "effect/reactivity";
 import {
   WS_METHODS,
+  ORCHESTRATION_V2_WS_METHODS,
+  type OrchestrationV2Command,
   type EnvironmentId,
   type OrchestrationV2ShellSnapshot,
 } from "@t3tools/contracts";
@@ -45,6 +47,7 @@ import {
   reorderPinnedThread,
   reorderActiveThread,
   setThreadAutoSettle,
+  setThreadTag,
   settleThread,
   snoozeThread,
   startThreadTurn,
@@ -200,6 +203,14 @@ export function createThreadEnvironmentAtoms<R, E>(
     setAutoSettle: createEnvironmentCommand(runtime, {
       label: "environment-data:commands:thread:set-auto-settle",
       execute: setThreadAutoSettle,
+      scheduler,
+      concurrency,
+    }),
+    setTag: createEnvironmentRpcCommand(runtime, {
+      tag: ORCHESTRATION_V2_WS_METHODS.dispatchCommand,
+      label: "environment-data:commands:thread:set-tag",
+      execute: (input: Extract<OrchestrationV2Command, { type: "thread.tag.set" }>) =>
+        setThreadTag(input),
       scheduler,
       concurrency,
     }),
@@ -424,6 +435,20 @@ export function createThreadEnvironmentAtoms<R, E>(
       ...thread,
       autoSettleDisabledAt: input.enabled ? null : (thread.autoSettleDisabledAt ?? now),
     })),
+    setTag: {
+      ...commands.setTag,
+      ...optimistic.wrap(commands.setTag, (thread, input) => {
+        const tags = thread.tags ?? [];
+        return {
+          ...thread,
+          tags: input.tagged
+            ? tags.includes(input.tag)
+              ? tags
+              : [...tags, input.tag]
+            : tags.filter((tag) => tag !== input.tag),
+        };
+      }),
+    },
     pin: optimistic.wrap(commands.pin, (thread, input, now) => ({
       ...thread,
       pinnedAt: thread.pinnedAt ?? now,

@@ -9,6 +9,7 @@ import {
 } from "react";
 import {
   ArchiveIcon,
+  TagsIcon,
   FlaskConicalIcon,
   BotIcon,
   createLucideIcon,
@@ -97,6 +98,7 @@ const SETTINGS_SECTION_ICONS: Readonly<
   "/settings/snap-shot": SnapShotIcon,
   "/settings/providers": BotIcon,
   "/settings/threads": MessagesSquareIcon,
+  "/settings/tags": TagsIcon,
   "/settings/browser": GlobeIcon,
   "/settings/devices": SmartphoneIcon,
   "/settings/scheduled-tasks": CalendarClockIcon,

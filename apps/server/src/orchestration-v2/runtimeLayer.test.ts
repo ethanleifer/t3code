@@ -2856,11 +2856,11 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
         threadId: threadIds[1]!,
       });
 
-      const kept = { name: "kept", color: "blue" } as const;
+      const kept = { name: "kept", color: "#3b82f6" } as const;
       const settings = yield* Effect.provide(
         ServerSettings.ServerSettingsService,
         ServerSettings.layerTest({
-          threadTagDefinitions: [{ name: "doomed", color: "red" }, kept],
+          threadTagDefinitions: [{ name: "doomed", color: "#ef4444" }, kept],
         }),
       );
       const current = yield* settings.getSettings;
