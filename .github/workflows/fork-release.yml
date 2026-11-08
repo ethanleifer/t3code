@@ -1,0 +1,97 @@
+name: Fork Release
+
+# Builds "T3 Code (Ethan)" for Apple Silicon from main and publishes it to this
+# fork's GitHub Releases, which the app's updater reads. Builds are unsigned
+# until a Developer ID certificate is added, so macOS cannot apply updates in
+# place; download the DMG from the release instead.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fork-release
+  cancel-in-progress: false
+
+jobs:
+  desktop_mac_arm64:
+    name: Desktop macOS arm64
+    if: github.repository == 'ethanleifer/t3code'
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      # checkout's credential cleanup fails on the orphaned gitlinks in .repos.
+      - name: Checkout
+        shell: bash
+        env:
+          GIT_TERMINAL_PROMPT: "0"
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git sparse-checkout set --no-cone '/*' '!/.repos/'
+          git checkout --detach FETCH_HEAD
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb # v1
+        with:
+          node-version-file: package.json
+          cache: true
+          run-install: false
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: stable
+          targets: aarch64-apple-darwin
+
+      - name: Install dependencies
+        run: vp install
+
+      # Stable-channel updates read /releases/latest and need a semver greater
+      # than the installed build.
+      - name: Set version and public configuration
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          base_version="$(node -p "require('./apps/desktop/package.json').version")"
+          version="${base_version}-ethan.${GITHUB_RUN_NUMBER}"
+          node scripts/update-release-package-versions.ts "$version"
+          # Public T3 Connect identifiers (Clerk publishable key, relay URL).
+          cp .env.example .env
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build desktop artifact
+        env:
+          T3CODE_DESKTOP_UPDATE_REPOSITORY: ${{ github.repository }}
+          T3CODE_TELEMETRY_CHANNEL: dev
+          T3CODE_DESKTOP_VERBOSE: "true"
+          T3CODE_DESKTOP_VERSION: ${{ steps.version.outputs.version }}
+        run: vp run dist:desktop:dmg:arm64
+
+      - name: Publish release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          assets=(release/*.dmg release/*.zip release/*.blockmap release/latest-mac.yml)
+          if [[ ! -f release/latest-mac.yml ]]; then
+            echo "::error::release/latest-mac.yml is missing; the updater would not see this release." >&2
+            ls -la release >&2
+            exit 1
+          fi
+          gh release create "v${VERSION}" "${assets[@]}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "T3 Code (Ethan) ${VERSION}" \
+            --notes "Unsigned Apple Silicon build of ${GITHUB_SHA}. Install the DMG, then run: xattr -dr com.apple.quarantine \"/Applications/T3 Code (Ethan).app\"" \
+            --latest
