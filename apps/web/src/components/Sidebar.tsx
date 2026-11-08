@@ -1,5 +1,9 @@
 import { attachSidebarTree } from "../lib/sidebarTree";
-import { type EnvironmentId, type ScopedProjectRef } from "@t3tools/contracts";
+import {
+  type EnvironmentId,
+  type ScopedProjectRef,
+  type ThreadTagDefinition,
+} from "@t3tools/contracts";
 import type { EnvironmentServerConfig } from "@t3tools/client-runtime/connection";
 import { ThreadContextDragGhost } from "./chat/ThreadContextDragGhost";
 import {
@@ -185,6 +189,7 @@ import {
   applySidebarThreadDrop,
   filterSidebarThreadsByTags,
   mergeThreadTagDefinitions,
+  groupSidebarThreadsByTag,
   filterSidebarV2VisibleThreads,
   groupSidebarThreadsByProject,
   sidebarFolderExpansionKeys,
@@ -260,7 +265,12 @@ import {
 import { SidebarContent, SidebarGroup, useSidebar } from "./ui/sidebar";
 import { SidebarChromeFooter, SidebarChromeHeader } from "./sidebar/SidebarChrome";
 import { SidebarHeaderIconButton, SidebarThreadHeader } from "./sidebar/SidebarThreadHeader";
-import { SidebarActiveTagFilter, SidebarTagFilterMenu } from "./sidebar/SidebarTagFilter";
+import {
+  SidebarActiveTagFilter,
+  SidebarTagFilterMenu,
+  SidebarTagGroupHeader,
+  type SidebarGrouping,
+} from "./sidebar/SidebarTagFilter";
 import { TooltipProvider } from "./ui/tooltip";
 import { composerDraftHasUserContent, DraftId, useComposerDraftStore } from "../composerDraftStore";
 import { useThreadRouteTarget } from "../hooks/useThreadRouteTarget";
@@ -338,6 +348,9 @@ const SETTLED_TAIL_PAGE_COUNT = 25;
 const SETTLED_SHELF_EXPANDED_KEY = "t3code:sidebar:settled-expanded";
 const SNOOZED_SHELF_EXPANDED_KEY = "t3code:sidebar:snoozed-expanded";
 const WORKING_SHELF_EXPANDED_KEY = "t3code:sidebar:working-expanded";
+const SIDEBAR_GROUPING_SCHEMA = Schema.Literals(["status", "tag"]);
+const COLLAPSED_TAG_GROUPS_SCHEMA = Schema.Array(Schema.String);
+const EMPTY_TAG_GROUPS: readonly string[] = [];
 
 const inboxReturns = createInboxReturnTracker();
 
@@ -426,6 +439,9 @@ function useSidebarThreads(input: {
   readonly projectScopeKey: string | null;
   readonly scopedProjectKeys: ReadonlySet<string> | null;
   readonly tagFilter: readonly string[] | null;
+  readonly grouping: SidebarGrouping;
+  readonly tagDefinitions: readonly ThreadTagDefinition[];
+  readonly collapsedTagGroups: readonly string[];
   readonly serverConfigs: ReadonlyMap<EnvironmentId, EnvironmentServerConfig>;
   readonly connectedEnvironmentIds: readonly EnvironmentId[];
   readonly optimisticDrop: SidebarOptimisticDrop | null;
@@ -509,7 +525,7 @@ function useSidebarThreads(input: {
   const olderSettledShelf = useOlderSettledShelf({
     scopes: olderSettledScopes([...serverConfigs.keys()], scopedProjectKeys),
     // Tags filter loaded shells only; older pages would be read without end for a rare tag.
-    expanded: settledShelfExpanded && tagFilter === null,
+    expanded: input.grouping === "status" && settledShelfExpanded && tagFilter === null,
     visibleCount: settledVisibleCount,
   });
   const listedSettledThreads = settledThreads.filter(olderSettledShelf.isListed);
@@ -559,15 +575,33 @@ function useSidebarThreads(input: {
               : EMPTY_THREADS,
           };
         });
-  const orderedThreads = [
-    ...pinnedThreads,
-    ...(projectFolders === null
-      ? activeThreads
-      : projectFolders.flatMap((folder) => folder.threads)),
-    ...visibleWorkingThreads,
-    ...visibleSnoozedThreads,
-    ...renderedSettledThreads,
-  ];
+  const tagGroups =
+    input.grouping === "tag"
+      ? groupSidebarThreadsByTag(
+          sortWorkingThreadsBySend(partition.visibleThreads),
+          input.tagDefinitions,
+        ).map((group) => {
+          const collapsed = input.collapsedTagGroups.includes(group.id);
+          return {
+            ...group,
+            count: group.threads.length,
+            collapsed,
+            threads: collapsed ? routeThreadOnly(group.threads, routeRowThreadKey) : group.threads,
+          };
+        })
+      : null;
+  const orderedThreads =
+    tagGroups !== null
+      ? tagGroups.flatMap((group) => group.threads)
+      : [
+          ...pinnedThreads,
+          ...(projectFolders === null
+            ? activeThreads
+            : projectFolders.flatMap((folder) => folder.threads)),
+          ...visibleWorkingThreads,
+          ...visibleSnoozedThreads,
+          ...renderedSettledThreads,
+        ];
   const sectionByThreadKey = new Map<string, SidebarSection>();
   for (const [list, section] of [
     [pinnedThreads, "pinned"],
@@ -605,6 +639,7 @@ function useSidebarThreads(input: {
     workingShelfExpanded,
     toggleWorkingShelf: () => setWorkingShelfExpanded((value) => !value),
     projectFolders,
+    tagGroups,
     toggleProjectFolder: (group: SidebarProjectSnapshot) => {
       const keys = sidebarFolderExpansionKeys(group);
       setProjectExpanded(keys, !resolveProjectExpanded(projectExpandedById, keys));
@@ -612,7 +647,7 @@ function useSidebarThreads(input: {
     renderedSettledThreads,
     visibleSnoozedThreads,
     visibleWorkingThreads,
-    orderedThreadKeys: orderedThreads.map(threadShellKey),
+    orderedThreadKeys: [...new Set(orderedThreads.map(threadShellKey))],
     threadByKey: new Map(orderedThreads.map((thread) => [threadShellKey(thread), thread] as const)),
     settledThreadKeys: new Set(settledThreads.map(threadShellKey)),
     snoozedThreadKeys: new Set(snoozedThreads.map(threadShellKey)),
@@ -1105,6 +1140,22 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       (environmentId) => serverConfigs.get(environmentId)?.settings.threadTagDefinitions ?? [],
     ),
   );
+  const [sidebarGrouping, setSidebarGrouping] = useLocalStorage(
+    "t3code:sidebar:grouping",
+    "status",
+    SIDEBAR_GROUPING_SCHEMA,
+  );
+  const [collapsedTagGroups, setCollapsedTagGroups] = useLocalStorage(
+    "t3code:sidebar:collapsed-tag-groups",
+    EMPTY_TAG_GROUPS,
+    COLLAPSED_TAG_GROUPS_SCHEMA,
+  );
+  const toggleTagGroup = (id: string) => {
+    clearSelection();
+    setCollapsedTagGroups((groups) =>
+      groups.includes(id) ? groups.filter((group) => group !== id) : [...groups, id],
+    );
+  };
   const persistedTagFilterNames = useUiStateStore((store) => store.sidebarTagFilterNames);
   const setPersistedTagFilterNames = useUiStateStore((store) => store.setSidebarTagFilterNames);
   const tagDefinitionsReady =
@@ -1367,6 +1418,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     workingShelfExpanded,
     toggleWorkingShelf,
     projectFolders,
+    tagGroups,
     toggleProjectFolder,
     renderedSettledThreads,
     visibleSnoozedThreads,
@@ -1384,21 +1436,33 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     projectScopeKey,
     scopedProjectKeys,
     tagFilter,
+    grouping: sidebarGrouping,
+    tagDefinitions: threadTagDefinitions,
+    collapsedTagGroups,
     serverConfigs,
     connectedEnvironmentIds,
     optimisticDrop,
     threads,
     delegatedUnderParent,
     routeRowThreadKey,
-    folderGroups: boringSidebarEnabled
-      ? scopedProjectGroups.length === 0
-        ? // An archived project keeps a folder for its active threads, below the rest.
-          [...scopeGroups, ...projectGroups.filter((project) => project.archived)]
-        : scopedProjectGroups
-      : null,
+    folderGroups:
+      sidebarGrouping === "status" && boringSidebarEnabled
+        ? scopedProjectGroups.length === 0
+          ? // An archived project keeps a folder for its active threads, below the rest.
+            [...scopeGroups, ...projectGroups.filter((project) => project.archived)]
+          : scopedProjectGroups
+        : null,
     keepEmptyFolders: (group) =>
       scopedProjectGroups.length > 0 || (group.pinned && !group.archived),
   });
+
+  const primaryTagGroupByThreadKey = new Map<string, string>();
+  for (const group of tagGroups ?? []) {
+    for (const thread of group.threads) {
+      const key = threadShellKey(thread);
+      if (!primaryTagGroupByThreadKey.has(key)) primaryTagGroupByThreadKey.set(key, group.id);
+    }
+  }
 
   // Ranked across environments as the palette ranks them, so one
   // environment's list does not sit above another's better matches; rows
@@ -1970,6 +2034,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   };
   const hasProjectFolders = projectFolders !== null && projectFolders.length > 0;
   const sidebarListItemsFresh = ((): readonly SidebarListItem[] => {
+    if (tagGroups !== null) return [];
     const rowsOf = (
       list: readonly EnvironmentThreadShell[],
       section: SidebarSection,
@@ -2012,9 +2077,16 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     return items;
   })();
   // Preserve the list while streamed updates leave order unchanged to retain row memoization.
-  const sidebarListItemsKey = sidebarListItemsFresh
-    .map((item) => (item.kind === "thread" ? item.section + ":" + item.key : item.marker))
-    .join("\n");
+  const sidebarListItemsKey = (
+    tagGroups === null
+      ? sidebarListItemsFresh.map((item) =>
+          item.kind === "thread" ? item.section + ":" + item.key : item.marker,
+        )
+      : tagGroups.flatMap((group) => [
+          group.id,
+          ...group.threads.map((thread) => JSON.stringify([group.id, threadShellKey(thread)])),
+        ])
+  ).join("\n");
   const [sidebarListItemsState, setSidebarListItems] = useState(sidebarListItemsFresh);
   const [sidebarListItemsKeyState, setSidebarListItemsKeyState] = useState(sidebarListItemsKey);
   let sidebarListItems = sidebarListItemsState;
@@ -2067,7 +2139,12 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         : { ...current, targetSection: target?.section ?? null },
     );
   };
-  const sortableIds = sidebarListItems.map(sidebarListItemId);
+  const sortableIds =
+    tagGroups === null
+      ? sidebarListItems.map(sidebarListItemId)
+      : tagGroups.flatMap((group) =>
+          group.threads.map((thread) => JSON.stringify([group.id, threadShellKey(thread)])),
+        );
   // Keep non-drag orders constant to preserve sorting strategy and row identity during streaming.
   const { settledOrder: draggedSettledOrder, activeOrder: draggedActiveOrder } =
     dragState === null
@@ -3247,6 +3324,12 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                   definitions={threadTagDefinitions}
                   selected={tagFilter ?? []}
                   onSelectedChange={setTagFilter}
+                  grouping={sidebarGrouping}
+                  onGroupingChange={(grouping) => {
+                    clearSelection();
+                    setSidebarGrouping(grouping);
+                    scrollSidebarToTop(sidebarContentRef.current);
+                  }}
                 />
               }
               onNewProject={openAddProjectCommandPalette}
@@ -3378,7 +3461,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                     role="presentation"
                     className={cn(
                       "relative flex flex-col gap-px",
-                      sidebarListItems.length > 0 && "flex-1",
+                      (sidebarListItems.length > 0 || (tagGroups?.length ?? 0) > 0) && "flex-1",
                       actionSweep !== null && "**:pointer-events-none",
                       // Projected rows (two boundary labels, two hints) extend the scroll range; a range that
                       // shrinks as the target changes clamps scrollTop and flips the target under a still pointer.
@@ -3396,27 +3479,37 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                         const threadKey = scopedThreadKey(
                           scopeThreadRef(thread.environmentId, thread.id),
                         );
+                        const rowId =
+                          tagGroups === null ? threadKey : JSON.stringify([folderRow, threadKey]);
+                        const isPrimaryRow =
+                          tagGroups === null ||
+                          primaryTagGroupByThreadKey.get(threadKey) === folderRow;
                         const isCard =
                           section === "active" || section === "pinned" || section === "working";
-                        const rowVariant = folderRow
-                          ? folderRowsMultiline
-                            ? "folder-multiline"
-                            : "folder"
-                          : isCard
+                        const rowVariant =
+                          tagGroups !== null
                             ? "card"
-                            : "slim";
+                            : folderRow
+                              ? folderRowsMultiline
+                                ? "folder-multiline"
+                                : "folder"
+                              : isCard
+                                ? "card"
+                                : "slim";
                         return (
                           <SortableThreadRow
-                            key={threadKey}
-                            sortableId={threadKey}
+                            key={rowId}
+                            sortableId={rowId}
                             contextDrag={isContextDrag}
                             sortableDisabled={
                               projectFolders !== null ||
+                              tagGroups !== null ||
                               renamingThreadKey === threadKey ||
                               !draggableThreadKeys.has(threadKey) ||
                               optimisticDrop !== null
                             }
                             thread={thread}
+                            navigationId={rowId}
                             variant={rowVariant}
                             navigationParent={
                               folderRow ??
@@ -3458,12 +3551,16 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                             wokeAt={threadWokeAt(thread, { now: snoozeNow })}
                             isActive={routeRowThreadKey === threadKey}
                             revealRef={
-                              routeRowThreadKey === threadKey ? revealActiveRow : undefined
+                              routeRowThreadKey === threadKey && isPrimaryRow
+                                ? revealActiveRow
+                                : undefined
                             }
                             isRouteThread={routeThreadKey === threadKey}
                             openPullRequestsInRightPanel={routeThreadRef !== null}
                             jumpLabel={
-                              showJumpHints ? (jumpLabelByKey.get(threadKey) ?? null) : null
+                              showJumpHints && isPrimaryRow
+                                ? (jumpLabelByKey.get(threadKey) ?? null)
+                                : null
                             }
                             currentEnvironmentId={primaryEnvironmentId}
                             environmentLabel={
@@ -3493,7 +3590,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                             onRenameTitleChange={setRenamingTitle}
                             onCommitRename={commitThreadRename}
                             onCancelRename={cancelThreadRename}
-                            isRenaming={renamingThreadKey === threadKey}
+                            isRenaming={renamingThreadKey === threadKey && isPrimaryRow}
                             renamingTitle={renamingThreadKey === threadKey ? renamingTitle : ""}
                             onContextMenu={handleThreadContextMenu}
                             onSettle={attemptSettle}
@@ -3519,6 +3616,31 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           onDraftContextMenu={handleDraftContextMenu}
                         />,
                       ];
+                      if (tagGroups !== null) {
+                        for (const group of tagGroups) {
+                          items.push(
+                            <SidebarTagGroupHeader
+                              key={group.id}
+                              id={group.id}
+                              name={group.name}
+                              color={group.color}
+                              count={group.count}
+                              collapsed={group.collapsed}
+                              onToggle={() => toggleTagGroup(group.id)}
+                            />,
+                          );
+                          for (const thread of group.threads) {
+                            items.push(
+                              renderThreadRow(
+                                thread,
+                                sectionByThreadKey.get(threadShellKey(thread)) ?? "active",
+                                group.id,
+                              ),
+                            );
+                          }
+                        }
+                        return items;
+                      }
                       for (const item of sidebarListItems) {
                         if (item.kind === "thread") {
                           // Folders draw active rows in their own place below.
@@ -3663,7 +3785,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                       }
                       return items;
                     })()}
-                    {settledShelfExpanded && hiddenSettledCount > 0 ? (
+                    {tagGroups === null && settledShelfExpanded && hiddenSettledCount > 0 ? (
                       <li className="list-none">
                         <button
                           type="button"

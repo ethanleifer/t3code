@@ -3,6 +3,7 @@ import { TagIcon, XIcon } from "lucide-react";
 
 import { cn } from "~/lib/utils";
 import { Button } from "../ui/button";
+import { CollapsibleSectionHeader } from "../ui/collapsible-section-header";
 import {
   Menu,
   MenuCheckboxItem,
@@ -10,10 +11,14 @@ import {
   MenuGroupLabel,
   MenuItem,
   MenuPopup,
+  MenuRadioGroup,
+  MenuRadioItem,
   MenuSeparator,
   MenuTrigger,
 } from "../ui/menu";
 import { SidebarHeaderIconButton } from "./SidebarThreadHeader";
+
+export type SidebarGrouping = "status" | "tag";
 
 function ThreadTagDot({
   color,
@@ -35,12 +40,15 @@ export function SidebarTagFilterMenu({
   definitions,
   selected,
   onSelectedChange,
+  grouping,
+  onGroupingChange,
 }: {
   definitions: ReadonlyArray<ThreadTagDefinition>;
   selected: readonly string[];
   onSelectedChange: (names: readonly string[]) => void;
+  grouping: SidebarGrouping;
+  onGroupingChange: (grouping: SidebarGrouping) => void;
 }) {
-  if (definitions.length === 0) return null;
   const selectedDefinitions = definitions.filter((definition) =>
     selected.includes(definition.name),
   );
@@ -73,7 +81,20 @@ export function SidebarTagFilterMenu({
       </MenuTrigger>
       <MenuPopup align="start" collisionAvoidance={{ side: "flip", align: "shift" }}>
         <MenuGroup>
-          <MenuGroupLabel>Show threads tagged</MenuGroupLabel>
+          <MenuGroupLabel>Group by</MenuGroupLabel>
+          <MenuRadioGroup
+            value={grouping}
+            onValueChange={(value) => {
+              if (value === "status" || value === "tag") onGroupingChange(value);
+            }}
+          >
+            <MenuRadioItem value="status">Status</MenuRadioItem>
+            <MenuRadioItem value="tag">Tag</MenuRadioItem>
+          </MenuRadioGroup>
+        </MenuGroup>
+        {definitions.length > 0 ? <MenuSeparator /> : null}
+        <MenuGroup>
+          {definitions.length > 0 ? <MenuGroupLabel>Show threads tagged</MenuGroupLabel> : null}
           {definitions.map((definition) => (
             <MenuCheckboxItem
               key={definition.name}
@@ -102,6 +123,35 @@ export function SidebarTagFilterMenu({
         ) : null}
       </MenuPopup>
     </Menu>
+  );
+}
+
+export function SidebarTagGroupHeader(props: {
+  id: string;
+  name: string;
+  color: string | null;
+  count: number;
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <li className="mt-2 list-none first:mt-0" data-thread-selection-safe>
+      <CollapsibleSectionHeader
+        data-sidebar-row={props.id}
+        expanded={!props.collapsed}
+        onClick={props.onToggle}
+        accessory={<span className="font-normal tabular-nums">{props.count}</span>}
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          {props.color === null ? (
+            <TagIcon className="size-3 shrink-0" />
+          ) : (
+            <ThreadTagDot color={props.color} />
+          )}
+          <span className="truncate">{props.name}</span>
+        </span>
+      </CollapsibleSectionHeader>
+    </li>
   );
 }
 
