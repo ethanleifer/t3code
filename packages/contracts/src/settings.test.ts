@@ -152,26 +152,28 @@ it("drops a hand-edited non-string hidden tag and keeps the rest of the settings
 it("drops bad and repeated tag definitions and keeps the rest", () => {
   const settings = decodeServerSettings({
     threadTagDefinitions: [
-      { name: "review", color: "blue" },
-      { name: "  ", color: "red" },
+      { name: "review", color: "#3b82f6" },
+      { name: "  ", color: "#ef4444" },
       { name: "urgent", color: "teal" },
+      { name: "loud", color: "#FF0000" },
       "loose",
-      { name: "review", color: "green" },
-      { name: "Review", color: "pink" },
+      { name: "review", color: "#22c55e" },
+      { name: "Review", color: "#ec4899" },
     ],
     hideTaggedThreads: true,
   });
   expect(settings.threadTagDefinitions).toEqual([
-    { name: "review", color: "blue" },
-    { name: "Review", color: "pink" },
+    { name: "review", color: "#3b82f6" },
+    { name: "loud", color: "#FF0000" },
+    { name: "Review", color: "#ec4899" },
   ]);
   expect(settings.hideTaggedThreads).toBe(true);
   expect(decodeServerSettings({}).threadTagDefinitions).toEqual([]);
   expect(() =>
     decodeServerSettingsPatch({
       threadTagDefinitions: [
-        { name: "review", color: "blue" },
-        { name: "review", color: "green" },
+        { name: "review", color: "#3b82f6" },
+        { name: "review", color: "#22c55e" },
       ],
     }),
   ).toThrow();
