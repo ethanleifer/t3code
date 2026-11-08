@@ -412,11 +412,11 @@ describe("sidebar tag filter", () => {
     const untagged = { id: "untagged", tags: undefined };
     const groups = groupSidebarThreadsByTag([both, settled, legacy, untagged], definitions);
     expect(groups.map((group) => [group.name, group.threads.map((thread) => thread.id)])).toEqual([
+      ["Untagged", ["legacy", "untagged"]],
       ["review", ["both"]],
       ["on hold", ["both"]],
-      ["Untagged", ["legacy", "untagged"]],
     ]);
-    expect(groups[0]?.color).toBe("#3b82f6");
+    expect(groups[1]?.color).toBe("#3b82f6");
     expect(groupSidebarThreadsByTag([], definitions)).toEqual([]);
     expect(groupSidebarThreadsByTag([settled, { ...settled, tags: [] }], definitions)).toEqual([]);
     const sameLabel = groupSidebarThreadsByTag(
@@ -424,7 +424,7 @@ describe("sidebar tag filter", () => {
       [{ name: "Untagged", color: "#123456" }],
     );
     expect(new Set(sameLabel.map((group) => group.id)).size).toBe(2);
-    expect(sameLabel[1]?.threads).toEqual([{ tags: ["Review"] }]);
+    expect(sameLabel[0]?.threads).toEqual([{ tags: ["Review"] }]);
   });
 
   it("keeps pins first in every tag group, then sorts by status or activity", () => {
@@ -473,6 +473,14 @@ describe("sidebar tag filter", () => {
       "ready",
       "input",
     ]);
+    const untagged = makeThread({ id: ThreadId.make("untagged"), tags: [] });
+    const pinnedUntagged = { ...pinned, id: ThreadId.make("pinned-untagged"), tags: [] };
+    const mixed = groupSidebarThreadsByTag(
+      sortSidebarGroupThreads([untagged, input, pinnedUntagged], "status"),
+      definitions,
+    );
+    expect(mixed[0]?.name).toBe("Untagged");
+    expect(mixed[0]?.threads.map((thread) => thread.id)).toEqual(["pinned-untagged", "untagged"]);
     expect(threads.map((thread) => thread.id)).toEqual(["waiting", "ready", "input", "pinned"]);
     expect(
       sortSidebarGroupThreads(
