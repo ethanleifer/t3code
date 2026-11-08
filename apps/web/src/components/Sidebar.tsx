@@ -3488,7 +3488,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           section === "active" || section === "pinned" || section === "working";
                         const rowVariant =
                           tagGroups !== null
-                            ? "card"
+                            ? isCard
+                              ? "card"
+                              : "slim"
                             : folderRow
                               ? folderRowsMultiline
                                 ? "folder-multiline"
