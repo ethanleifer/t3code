@@ -3404,6 +3404,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
             Layer.mergeAll(
               NodeServices.layer,
               NodeCrypto.layer,
+              ServerSettings.layerTest(),
               Layer.mock(PullRequestService.PullRequestService)({
                 watchFingerprint: () => Effect.succeed(null),
                 detail: () =>
@@ -3533,6 +3534,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
       const host = Layer.mergeAll(
         NodeServices.layer,
         NodeCrypto.layer,
+        ServerSettings.layerTest(),
         Layer.mock(PullRequestService.PullRequestService)({
           detail: () =>
             Effect.sync(() => ({
@@ -3632,6 +3634,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
       const host = Layer.mergeAll(
         NodeServices.layer,
         NodeCrypto.layer,
+        ServerSettings.layerTest(),
         Layer.mock(PullRequestService.PullRequestService)({
           detail: () =>
             Effect.sync(() => ({
@@ -3777,6 +3780,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
       const host = Layer.mergeAll(
         NodeServices.layer,
         NodeCrypto.layer,
+        ServerSettings.layerTest(),
         Layer.mock(PullRequestService.PullRequestService)({
           detail: () =>
             Effect.sync(() => ({
@@ -3876,6 +3880,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
       const host = Layer.mergeAll(
         NodeServices.layer,
         NodeCrypto.layer,
+        ServerSettings.layerTest(),
         Layer.mock(PullRequestService.PullRequestService)({
           detail: () =>
             Effect.sync(() => ({
@@ -3980,6 +3985,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
       const host = Layer.mergeAll(
         NodeServices.layer,
         NodeCrypto.layer,
+        ServerSettings.layerTest(),
         Layer.mock(PullRequestService.PullRequestService)({
           detail: () =>
             Effect.sync(() => ({
@@ -4095,6 +4101,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
         const host = Layer.mergeAll(
           NodeServices.layer,
           NodeCrypto.layer,
+          ServerSettings.layerTest(),
           Layer.mock(PullRequestService.PullRequestService)({
             // The host reports the same fingerprint throughout, so only the deadline can prompt a read.
             watchFingerprint: () =>
@@ -4319,6 +4326,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
           Layer.mergeAll(
             NodeServices.layer,
             NodeCrypto.layer,
+            ServerSettings.layerTest(),
             Layer.mock(PullRequestService.PullRequestService)({
               detail: () => Effect.succeed(detail),
               activity: () =>
@@ -4470,6 +4478,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
       const host = Layer.mergeAll(
         NodeServices.layer,
         NodeCrypto.layer,
+        ServerSettings.layerTest(),
         Layer.mock(PullRequestService.PullRequestService)({
           watchFingerprint: (input) =>
             input.number === 21
