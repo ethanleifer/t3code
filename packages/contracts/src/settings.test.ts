@@ -158,14 +158,14 @@ it("drops bad and repeated tag definitions and keeps the rest", () => {
       { name: "loud", color: "#FF0000" },
       "loose",
       { name: "review", color: "#22c55e" },
-      { name: "Review", color: "#ec4899" },
+      { name: "Review", color: "#ec4899", category: "Topic" },
     ],
     hideTaggedThreads: true,
   });
   expect(settings.threadTagDefinitions).toEqual([
     { name: "review", color: "#3b82f6" },
     { name: "loud", color: "#FF0000" },
-    { name: "Review", color: "#ec4899" },
+    { name: "Review", color: "#ec4899", category: "Topic" },
   ]);
   expect(settings.hideTaggedThreads).toBe(true);
   expect(decodeServerSettings({}).threadTagDefinitions).toEqual([]);
@@ -175,6 +175,16 @@ it("drops bad and repeated tag definitions and keeps the rest", () => {
         { name: "review", color: "#3b82f6" },
         { name: "review", color: "#22c55e" },
       ],
+    }),
+  ).toThrow();
+  expect(
+    decodeServerSettingsPatch({
+      threadTagDefinitions: [{ name: "auth", color: "#3b82f6", category: "Topic" }],
+    }).threadTagDefinitions,
+  ).toEqual([{ name: "auth", color: "#3b82f6", category: "Topic" }]);
+  expect(() =>
+    decodeServerSettingsPatch({
+      threadTagDefinitions: [{ name: "auth", color: "#3b82f6", category: "" }],
     }),
   ).toThrow();
 });

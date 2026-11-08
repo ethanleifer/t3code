@@ -1069,17 +1069,26 @@ export function groupSidebarThreadsByTag<
     readonly tags?: readonly string[] | undefined;
     readonly settledOverride?: SidebarThreadSummary["settledOverride"] | undefined;
   },
->(threads: readonly T[], definitions: readonly ThreadTagDefinition[]) {
-  const groups = definitions.map((definition) => ({
-    id: `tag-group:${JSON.stringify(definition.name)}`,
-    name: definition.name,
-    color: definition.color,
-    threads: new Array<T>(),
-  }));
+>(
+  threads: readonly T[],
+  definitions: readonly ThreadTagDefinition[],
+  category: string | null = null,
+) {
+  const groups = definitions
+    .filter((definition) => category === null || definition.category === category)
+    .map((definition) => ({
+      id: `tag-group:${JSON.stringify(definition.name)}`,
+      name: definition.name,
+      color: definition.color,
+      threads: new Array<T>(),
+    }));
   const byName = new Map(groups.map((group) => [group.name, group]));
   const untagged = {
-    id: "tag-group:untagged",
-    name: "Untagged",
+    id:
+      category === null
+        ? "tag-group:untagged"
+        : `tag-group:uncategorized:${JSON.stringify(category)}`,
+    name: category === null ? "Untagged" : `No ${category.toLowerCase()}`,
     color: null,
     threads: new Array<T>(),
   };

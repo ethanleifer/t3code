@@ -1,5 +1,10 @@
 import { attachSidebarTree } from "../lib/sidebarTree";
-import { EnvironmentId, type ScopedProjectRef, type ThreadTagDefinition } from "@t3tools/contracts";
+import {
+  EnvironmentId,
+  ThreadTag,
+  type ScopedProjectRef,
+  type ThreadTagDefinition,
+} from "@t3tools/contracts";
 import type { EnvironmentServerConfig } from "@t3tools/client-runtime/connection";
 import { ThreadContextDragGhost } from "./chat/ThreadContextDragGhost";
 import {
@@ -351,6 +356,7 @@ const SETTLED_SHELF_EXPANDED_KEY = "t3code:sidebar:settled-expanded";
 const SNOOZED_SHELF_EXPANDED_KEY = "t3code:sidebar:snoozed-expanded";
 const WORKING_SHELF_EXPANDED_KEY = "t3code:sidebar:working-expanded";
 const SIDEBAR_GROUP_SORT_SCHEMA = Schema.Literals(["status", "activity"]);
+const SIDEBAR_TAG_CATEGORY_SCHEMA = Schema.NullOr(ThreadTag);
 const SIDEBAR_GROUPING_SCHEMA = Schema.Literals(["status", "tag"]);
 const COLLAPSED_TAG_GROUPS_SCHEMA = Schema.Array(Schema.String);
 const MACHINE_FILTER_SCHEMA = Schema.NullOr(EnvironmentId);
@@ -444,6 +450,7 @@ function useSidebarThreads(input: {
   readonly scopedProjectKeys: ReadonlySet<string> | null;
   readonly tagFilter: readonly string[] | null;
   readonly grouping: SidebarGrouping;
+  readonly tagCategory: string | null;
   readonly sorting: SidebarGroupSort;
   readonly tagDefinitions: readonly ThreadTagDefinition[];
   readonly collapsedTagGroups: readonly string[];
@@ -588,6 +595,7 @@ function useSidebarThreads(input: {
       ? groupSidebarThreadsByTag(
           sortSidebarGroupThreads(partition.visibleThreads, input.sorting),
           input.tagDefinitions,
+          input.tagCategory,
         ).map((group) => {
           const collapsed = input.collapsedTagGroups.includes(group.id);
           return {
@@ -1167,6 +1175,11 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     "status",
     SIDEBAR_GROUPING_SCHEMA,
   );
+  const [sidebarTagCategory, setSidebarTagCategory] = useLocalStorage(
+    "t3code:sidebar:tag-category",
+    null,
+    SIDEBAR_TAG_CATEGORY_SCHEMA,
+  );
   const [sidebarGroupSort, setSidebarGroupSort] = useLocalStorage(
     "t3code:sidebar:group-sort",
     "status",
@@ -1471,6 +1484,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     scopedProjectKeys,
     tagFilter,
     grouping: sidebarGrouping,
+    tagCategory: sidebarTagCategory,
     sorting: sidebarGroupSort,
     tagDefinitions: threadTagDefinitions,
     collapsedTagGroups,
@@ -3436,15 +3450,17 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                   selected={tagFilter ?? []}
                   onSelectedChange={setTagFilter}
                   grouping={sidebarGrouping}
+                  category={sidebarTagCategory}
                   sorting={sidebarGroupSort}
                   onSortingChange={(sorting) => {
                     clearSelection();
                     setSidebarGroupSort(sorting);
                     scrollSidebarToTop(sidebarContentRef.current);
                   }}
-                  onGroupingChange={(grouping) => {
+                  onGroupingChange={(grouping, category) => {
                     clearSelection();
                     setSidebarGrouping(grouping);
+                    setSidebarTagCategory(category);
                     scrollSidebarToTop(sidebarContentRef.current);
                   }}
                 />

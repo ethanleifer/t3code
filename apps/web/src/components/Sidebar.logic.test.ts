@@ -427,6 +427,52 @@ describe("sidebar tag filter", () => {
     expect(sameLabel[0]?.threads).toEqual([{ tags: ["Review"] }]);
   });
 
+  it("groups only the selected category and keeps threads without that category visible", () => {
+    const categorized = [
+      { name: "auth", color: "#3b82f6", category: "Topic" },
+      { name: "billing", color: "#ef4444", category: "Topic" },
+      { name: "needs-review", color: "#8b5cf6", category: "Workflow" },
+      { name: "legacy", color: "#22c55e" },
+    ];
+    const threads = [
+      { id: "both-topics", tags: ["auth", "billing", "needs-review"] },
+      { id: "workflow-only", tags: ["needs-review"] },
+      { id: "uncategorized", tags: ["legacy"] },
+      { id: "untagged", tags: [] },
+      { id: "settled", tags: ["auth"], settledOverride: "settled" as const },
+    ];
+    const topicGroups = groupSidebarThreadsByTag(threads, categorized, "Topic");
+    expect(
+      topicGroups.map((group) => [group.name, group.threads.map((thread) => thread.id)]),
+    ).toEqual([
+      ["No topic", ["workflow-only", "uncategorized", "untagged"]],
+      ["auth", ["both-topics"]],
+      ["billing", ["both-topics"]],
+    ]);
+    expect(
+      groupSidebarThreadsByTag(threads, categorized, "Workflow").map((group) => [
+        group.name,
+        group.threads.map((thread) => thread.id),
+      ]),
+    ).toEqual([
+      ["No workflow", ["uncategorized", "untagged"]],
+      ["needs-review", ["both-topics", "workflow-only"]],
+    ]);
+    expect(groupSidebarThreadsByTag(threads, categorized).map((group) => group.name)).toEqual([
+      "Untagged",
+      "auth",
+      "billing",
+      "needs-review",
+      "legacy",
+    ]);
+    expect(
+      groupSidebarThreadsByTag(threads, categorized, "topic").map((group) => group.name),
+    ).toEqual(["No topic"]);
+    expect(topicGroups[0]?.id).not.toBe(
+      groupSidebarThreadsByTag(threads, categorized, "Workflow").at(0)?.id,
+    );
+  });
+
   it("keeps pins first in every tag group, then sorts by status or activity", () => {
     const pinned = makeThread({
       id: ThreadId.make("pinned"),

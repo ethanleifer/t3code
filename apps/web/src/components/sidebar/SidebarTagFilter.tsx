@@ -42,6 +42,7 @@ export function SidebarTagFilterMenu({
   selected,
   onSelectedChange,
   grouping,
+  category,
   onGroupingChange,
   sorting,
   onSortingChange,
@@ -52,8 +53,16 @@ export function SidebarTagFilterMenu({
   sorting: SidebarGroupSort;
   onSortingChange: (sorting: SidebarGroupSort) => void;
   grouping: SidebarGrouping;
-  onGroupingChange: (grouping: SidebarGrouping) => void;
+  category: string | null;
+  onGroupingChange: (grouping: SidebarGrouping, category: string | null) => void;
 }) {
+  const categories = [
+    ...new Set([
+      "Topic",
+      ...(category === null ? [] : [category]),
+      ...definitions.flatMap((definition) => (definition.category ? [definition.category] : [])),
+    ]),
+  ];
   const selectedDefinitions = definitions.filter((definition) =>
     selected.includes(definition.name),
   );
@@ -88,13 +97,20 @@ export function SidebarTagFilterMenu({
         <MenuGroup>
           <MenuGroupLabel>Group by</MenuGroupLabel>
           <MenuRadioGroup
-            value={grouping}
+            value={grouping === "tag" && category !== null ? `category:${category}` : grouping}
             onValueChange={(value) => {
-              if (value === "status" || value === "tag") onGroupingChange(value);
+              if (value === "status" || value === "tag") onGroupingChange(value, null);
+              else if (value.startsWith("category:") && categories.includes(value.slice(9)))
+                onGroupingChange("tag", value.slice(9));
             }}
           >
             <MenuRadioItem value="status">Status</MenuRadioItem>
-            <MenuRadioItem value="tag">Tag</MenuRadioItem>
+            <MenuRadioItem value="tag">All tags</MenuRadioItem>
+            {categories.map((name) => (
+              <MenuRadioItem key={name} value={`category:${name}`}>
+                {name} tags
+              </MenuRadioItem>
+            ))}
           </MenuRadioGroup>
         </MenuGroup>
         <MenuSeparator />

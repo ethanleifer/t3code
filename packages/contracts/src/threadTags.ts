@@ -27,6 +27,7 @@ export type ThreadTagColor = typeof ThreadTagColor.Type;
 export const ThreadTagDefinition = Schema.Struct({
   name: ThreadTag,
   color: ThreadTagColor,
+  category: Schema.optionalKey(ThreadTag),
 });
 export type ThreadTagDefinition = typeof ThreadTagDefinition.Type;
 
