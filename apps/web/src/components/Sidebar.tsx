@@ -216,6 +216,8 @@ import {
   sidebarThreadKeyAtY,
   sortInboxThreadsByReturn,
   sortPinnedThreadsForSidebar,
+  sortSidebarGroupThreads,
+  type SidebarGroupSort,
   sortThreadsForSidebar,
   sortWorkingThreadsBySend,
   useSnoozeWakeClock,
@@ -348,6 +350,7 @@ const SETTLED_TAIL_PAGE_COUNT = 25;
 const SETTLED_SHELF_EXPANDED_KEY = "t3code:sidebar:settled-expanded";
 const SNOOZED_SHELF_EXPANDED_KEY = "t3code:sidebar:snoozed-expanded";
 const WORKING_SHELF_EXPANDED_KEY = "t3code:sidebar:working-expanded";
+const SIDEBAR_GROUP_SORT_SCHEMA = Schema.Literals(["status", "activity"]);
 const SIDEBAR_GROUPING_SCHEMA = Schema.Literals(["status", "tag"]);
 const COLLAPSED_TAG_GROUPS_SCHEMA = Schema.Array(Schema.String);
 const MACHINE_FILTER_SCHEMA = Schema.NullOr(EnvironmentId);
@@ -441,6 +444,7 @@ function useSidebarThreads(input: {
   readonly scopedProjectKeys: ReadonlySet<string> | null;
   readonly tagFilter: readonly string[] | null;
   readonly grouping: SidebarGrouping;
+  readonly sorting: SidebarGroupSort;
   readonly tagDefinitions: readonly ThreadTagDefinition[];
   readonly collapsedTagGroups: readonly string[];
   readonly serverConfigs: ReadonlyMap<EnvironmentId, EnvironmentServerConfig>;
@@ -520,13 +524,16 @@ function useSidebarThreads(input: {
     clockKey: `${nowMinute}:${snoozeWakeClock}:${inboxReturnsVersion}`,
   });
 
-  const { pinnedThreads, activeThreads, workingThreads, snoozedThreads, settledThreads } =
-    partition;
+  const pinnedThreads = partition.pinnedThreads;
+  const activeThreads = sortSidebarGroupThreads(partition.activeThreads, input.sorting);
+  const workingThreads = sortSidebarGroupThreads(partition.workingThreads, input.sorting);
+  const snoozedThreads = sortSidebarGroupThreads(partition.snoozedThreads, input.sorting);
+  const settledThreads = sortSidebarGroupThreads(partition.settledThreads, input.sorting);
   // Older settled threads load in pages; the shelf lists them only as far as they are loaded.
   const olderSettledShelf = useOlderSettledShelf({
     scopes: olderSettledScopes([...serverConfigs.keys()], scopedProjectKeys),
     // Tags filter loaded shells only; older pages would be read without end for a rare tag.
-    expanded: input.grouping === "status" && settledShelfExpanded && tagFilter === null,
+    expanded: settledShelfExpanded && tagFilter === null,
     visibleCount: settledVisibleCount,
   });
   const listedSettledThreads = settledThreads.filter(olderSettledShelf.isListed);
@@ -579,7 +586,7 @@ function useSidebarThreads(input: {
   const tagGroups =
     input.grouping === "tag"
       ? groupSidebarThreadsByTag(
-          sortWorkingThreadsBySend(partition.visibleThreads),
+          sortSidebarGroupThreads(partition.visibleThreads, input.sorting),
           input.tagDefinitions,
         ).map((group) => {
           const collapsed = input.collapsedTagGroups.includes(group.id);
@@ -593,7 +600,7 @@ function useSidebarThreads(input: {
       : null;
   const orderedThreads =
     tagGroups !== null
-      ? tagGroups.flatMap((group) => group.threads)
+      ? [...tagGroups.flatMap((group) => group.threads), ...renderedSettledThreads]
       : [
           ...pinnedThreads,
           ...(projectFolders === null
@@ -615,6 +622,10 @@ function useSidebarThreads(input: {
   }
   return {
     ...partition,
+    activeThreads,
+    workingThreads,
+    snoozedThreads,
+    settledThreads,
     threads,
     workingShelfEnabled,
     searchableThreads: [
@@ -1156,6 +1167,11 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     "status",
     SIDEBAR_GROUPING_SCHEMA,
   );
+  const [sidebarGroupSort, setSidebarGroupSort] = useLocalStorage(
+    "t3code:sidebar:group-sort",
+    "status",
+    SIDEBAR_GROUP_SORT_SCHEMA,
+  );
   const [collapsedTagGroups, setCollapsedTagGroups] = useLocalStorage(
     "t3code:sidebar:collapsed-tag-groups",
     EMPTY_TAG_GROUPS,
@@ -1455,6 +1471,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     scopedProjectKeys,
     tagFilter,
     grouping: sidebarGrouping,
+    sorting: sidebarGroupSort,
     tagDefinitions: threadTagDefinitions,
     collapsedTagGroups,
     serverConfigs,
@@ -2060,7 +2077,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   };
   const hasProjectFolders = projectFolders !== null && projectFolders.length > 0;
   const sidebarListItemsFresh = ((): readonly SidebarListItem[] => {
-    if (tagGroups !== null) return [];
     const rowsOf = (
       list: readonly EnvironmentThreadShell[],
       section: SidebarSection,
@@ -2069,6 +2085,13 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         const key = scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id));
         return { kind: "thread", key, section };
       });
+    if (tagGroups !== null) {
+      return [
+        { kind: "marker", marker: "settled-header" },
+        { kind: "marker", marker: "settled-placeholder" },
+        ...rowsOf(renderedSettledThreads, "settled"),
+      ];
+    }
     // Boring mode keeps a pinned open project or one the user filtered to, so it can start a thread.
     if (
       !hasProjectFolders &&
@@ -2103,16 +2126,15 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     return items;
   })();
   // Preserve the list while streamed updates leave order unchanged to retain row memoization.
-  const sidebarListItemsKey = (
-    tagGroups === null
-      ? sidebarListItemsFresh.map((item) =>
-          item.kind === "thread" ? item.section + ":" + item.key : item.marker,
-        )
-      : tagGroups.flatMap((group) => [
-          group.id,
-          ...group.threads.map((thread) => JSON.stringify([group.id, threadShellKey(thread)])),
-        ])
-  ).join("\n");
+  const sidebarListItemsKey = [
+    ...sidebarListItemsFresh.map((item) =>
+      item.kind === "thread" ? item.section + ":" + item.key : item.marker,
+    ),
+    ...(tagGroups ?? []).flatMap((group) => [
+      group.id,
+      ...group.threads.map((thread) => JSON.stringify([group.id, threadShellKey(thread)])),
+    ]),
+  ].join("\n");
   const [sidebarListItemsState, setSidebarListItems] = useState(sidebarListItemsFresh);
   const [sidebarListItemsKeyState, setSidebarListItemsKeyState] = useState(sidebarListItemsKey);
   let sidebarListItems = sidebarListItemsState;
@@ -2168,9 +2190,12 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const sortableIds =
     tagGroups === null
       ? sidebarListItems.map(sidebarListItemId)
-      : tagGroups.flatMap((group) =>
-          group.threads.map((thread) => JSON.stringify([group.id, threadShellKey(thread)])),
-        );
+      : [
+          ...tagGroups.flatMap((group) =>
+            group.threads.map((thread) => JSON.stringify([group.id, threadShellKey(thread)])),
+          ),
+          ...sidebarListItems.map(sidebarListItemId),
+        ];
   // Keep non-drag orders constant to preserve sorting strategy and row identity during streaming.
   const { settledOrder: draggedSettledOrder, activeOrder: draggedActiveOrder } =
     dragState === null
@@ -3411,6 +3436,12 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                   selected={tagFilter ?? []}
                   onSelectedChange={setTagFilter}
                   grouping={sidebarGrouping}
+                  sorting={sidebarGroupSort}
+                  onSortingChange={(sorting) => {
+                    clearSelection();
+                    setSidebarGroupSort(sorting);
+                    scrollSidebarToTop(sidebarContentRef.current);
+                  }}
                   onGroupingChange={(grouping) => {
                     clearSelection();
                     setSidebarGrouping(grouping);
@@ -3565,11 +3596,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                         const threadKey = scopedThreadKey(
                           scopeThreadRef(thread.environmentId, thread.id),
                         );
-                        const rowId =
-                          tagGroups === null ? threadKey : JSON.stringify([folderRow, threadKey]);
+                        const isTagRow = tagGroups !== null && section !== "settled";
+                        const rowId = isTagRow ? JSON.stringify([folderRow, threadKey]) : threadKey;
                         const isPrimaryRow =
-                          tagGroups === null ||
-                          primaryTagGroupByThreadKey.get(threadKey) === folderRow;
+                          !isTagRow || primaryTagGroupByThreadKey.get(threadKey) === folderRow;
                         const isCard =
                           section === "active" || section === "pinned" || section === "working";
                         const rowVariant =
@@ -3592,6 +3622,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                             sortableDisabled={
                               projectFolders !== null ||
                               tagGroups !== null ||
+                              section !== "pinned" ||
                               renamingThreadKey === threadKey ||
                               !draggableThreadKeys.has(threadKey) ||
                               optimisticDrop !== null
@@ -3727,7 +3758,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                             );
                           }
                         }
-                        return items;
                       }
                       for (const item of sidebarListItems) {
                         if (item.kind === "thread") {
@@ -3873,7 +3903,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                       }
                       return items;
                     })()}
-                    {tagGroups === null && settledShelfExpanded && hiddenSettledCount > 0 ? (
+                    {settledShelfExpanded && hiddenSettledCount > 0 ? (
                       <li className="list-none">
                         <button
                           type="button"

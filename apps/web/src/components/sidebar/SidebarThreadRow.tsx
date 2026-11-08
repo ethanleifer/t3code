@@ -1,3 +1,4 @@
+import { ThreadTagLabels } from "../chat/ThreadTagLabels";
 import { ThreadHoverCard, ThreadHoverCardPopup } from "../ThreadHoverCard";
 import { ThreadTerminalStatusButton } from "../ThreadStatusIndicators";
 import { discardComposerDraft } from "../../lib/discardComposerDraft";
@@ -1141,6 +1142,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     !thread.branch &&
     !showsScratchMachine &&
     prBadge === null &&
+    !thread.tags?.length &&
     diff === null &&
     runningTerminalIds.length === 0;
   const metaLine = metaLineEmpty ? null : (
@@ -1148,7 +1150,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       {thread.branch ? (
         <>
           <ThreadWorktreeIndicator thread={thread} />
-          <span className="flex min-w-0 flex-1">
+          <span className={cn("flex min-w-0", thread.tags?.length ? "max-w-24" : "flex-1")}>
             <MiddleTruncate value={thread.branch} showTitle={false} />
           </span>
         </>
@@ -1159,11 +1161,18 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
             kind={props.environmentMachine}
             className="size-3 shrink-0"
           />
-          <span className="min-w-0 flex-1 truncate">{props.scratchMachineLabel}</span>
+          <span className={cn("min-w-0 truncate", thread.tags?.length ? "max-w-24" : "flex-1")}>
+            {props.scratchMachineLabel}
+          </span>
         </>
-      ) : (
+      ) : thread.tags?.length ? null : (
         <span className="flex-1" />
       )}
+      {thread.tags?.length ? (
+        <div className="min-w-0 flex-1">
+          <ThreadTagLabels threadRef={threadRef} variant="inline" />
+        </div>
+      ) : null}
       {terminalStatusIcon}
       {prBadge}
       {diff ? (
