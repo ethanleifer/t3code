@@ -19,16 +19,9 @@ export const StoredThreadTags = Schema.Array(Schema.String).pipe(
   Schema.catchDecoding(() => Effect.succeedSome([])),
 );
 
-export const ThreadTagColor = Schema.Literals([
-  "gray",
-  "red",
-  "orange",
-  "yellow",
-  "green",
-  "blue",
-  "purple",
-  "pink",
-]);
+export const ThreadTagColor = Schema.String.check(
+  Schema.isPattern(/^#[0-9a-fA-F]{6}$/, { message: "A tag color must be a #rrggbb hex color." }),
+);
 export type ThreadTagColor = typeof ThreadTagColor.Type;
 
 export const ThreadTagDefinition = Schema.Struct({
