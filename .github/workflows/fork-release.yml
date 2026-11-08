@@ -1,7 +1,7 @@
 name: Fork Release
 
-# Builds "T3 Code (Ethan)" for Apple Silicon from main and publishes it to this
-# fork's GitHub Releases, which the app's updater reads. Builds are unsigned
+# Builds "T3 Code (Ethan)" for Apple Silicon from main as a nightly and publishes
+# it to this fork's GitHub Releases, which the app's updater reads. Builds are unsigned
 # until a Developer ID certificate is added, so macOS cannot apply updates in
 # place; download the DMG from the release instead.
 
@@ -53,15 +53,15 @@ jobs:
       - name: Install dependencies
         run: vp install
 
-      # Stable-channel updates read /releases/latest and need a semver greater
-      # than the installed build.
+      # The -nightly.YYYYMMDD.N shape selects nightly branding and the nightly
+      # update channel, which reads prereleases from the releases feed.
       - name: Set version and public configuration
         id: version
         shell: bash
         run: |
           set -euo pipefail
           base_version="$(node -p "require('./apps/desktop/package.json').version")"
-          version="${base_version}-ethan.${GITHUB_RUN_NUMBER}"
+          version="${base_version}-nightly.$(date -u +%Y%m%d).${GITHUB_RUN_NUMBER}"
           node scripts/update-release-package-versions.ts "$version"
           # Public T3 Connect identifiers (Clerk publishable key, relay URL).
           cp .env.example .env
@@ -83,9 +83,9 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          assets=(release/*.dmg release/*.zip release/*.blockmap release/latest-mac.yml)
-          if [[ ! -f release/latest-mac.yml ]]; then
-            echo "::error::release/latest-mac.yml is missing; the updater would not see this release." >&2
+          assets=(release/*.dmg release/*.zip release/*.blockmap release/nightly-mac.yml)
+          if [[ ! -f release/nightly-mac.yml ]]; then
+            echo "::error::release/nightly-mac.yml is missing; the updater would not see this release." >&2
             ls -la release >&2
             exit 1
           fi
@@ -94,4 +94,4 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "T3 Code (Ethan) ${VERSION}" \
             --notes "Unsigned Apple Silicon build of ${GITHUB_SHA}. Install the DMG, then run: xattr -dr com.apple.quarantine \"/Applications/T3 Code (Ethan).app\"" \
-            --latest
+            --prerelease
