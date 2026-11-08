@@ -19,6 +19,7 @@ import {
   RunId,
   NonNegativeInt,
   ProjectId,
+  ThreadTag,
 } from "@t3tools/contracts";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Schema from "effect/Schema";
@@ -31,7 +32,7 @@ import * as McpInvocationContext from "../../McpInvocationContext.ts";
 
 const ThreadOrganizeTool = Tool.make("t3_thread_organize", {
   description:
-    "Pin, snooze, settle, archive, or mark a thread unread. Omit `threadId` for this thread. `snooze` needs `snoozedUntil`. Settling this thread applies at turn end. A failed turn or queued message leaves it active.",
+    "Pin, snooze, settle, archive, tag, or mark a thread unread. Omit `threadId` for this thread. `snooze` needs `snoozedUntil`. `tag` and `untag` require `tag`. Applying a tag requires an exact, case-sensitive name from Settings → Tags; unknown names fail with the valid names. Removing an absent or legacy tag succeeds. Settling this thread applies at turn end. A failed turn or queued message leaves it active.",
   parameters: Schema.Struct({
     environmentId: OrchestratorMcpEnvironmentTarget,
     threadId: Schema.optional(ThreadId),
@@ -45,8 +46,11 @@ const ThreadOrganizeTool = Tool.make("t3_thread_organize", {
       "archive",
       "unarchive",
       "mark_unread",
+      "tag",
+      "untag",
     ]),
     snoozedUntil: Schema.optional(IsoDateTime),
+    tag: Schema.optional(ThreadTag),
   }),
   success: Schema.Union([
     OrchestrationV2DispatchCommandResult,

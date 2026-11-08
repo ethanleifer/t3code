@@ -421,6 +421,49 @@ it.effect("rejects an unknown organize target instead of archiving the calling t
   );
 });
 
+const organize = (args: Record<string, unknown>) =>
+  Effect.flatMap(McpServer.McpServer, (server) =>
+    server.callTool({ name: "t3_thread_organize", arguments: args }),
+  ).pipe(
+    Effect.provideService(McpInvocationContext.McpInvocationContext, scope),
+    Effect.provideService(McpSchema.McpServerClient, client),
+  );
+it.effect("requires tag only for tag actions and returns valid names from the service", () => {
+  return Effect.gen(function* () {
+    for (const action of ["tag", "untag"]) {
+      expect(declaredFailure(yield* organize({ action }))).toMatchObject({
+        code: "invalid_request",
+        message: "This action needs `tag`.",
+      });
+    }
+    expect(declaredFailure(yield* organize({ action: "tag", tag: "Later" }))).toMatchObject({
+      code: "invalid_request",
+      message: 'Unknown tag "Later". Valid tag names: "Blocked", "Review".',
+    });
+  }).pipe(
+    Effect.provide(
+      layerThreadToolkit.pipe(
+        Layer.provideMerge(McpHttpServer.layerInProcessMcpServer),
+        Layer.provide(NodeCrypto.layer),
+        Layer.provide(
+          Layer.mock(ThreadManagement.ThreadManagementService)({
+            getThreadShell: (id) => Effect.succeed(McpToolAccessTestkit.liveThreadShell(id)),
+            getProjectThreadRecords: ({ threadId: id }) =>
+              Effect.succeed(
+                McpToolAccessTestkit.idleThreadProjection(McpToolAccessTestkit.liveThreadShell(id)),
+              ),
+            setThreadTag: () =>
+              new ThreadManagement.ThreadManagementUnknownTagError({
+                tag: "Later",
+                validNames: ["Blocked", "Review"],
+              }),
+          }),
+        ),
+      ),
+    ),
+  );
+});
+
 it.effect("keeps unexpected handler defects private through the production registration", () =>
   Effect.gen(function* () {
     const server = yield* McpServer.McpServer;
@@ -600,11 +643,14 @@ it.effect("a read-only client reads threads and is refused every write before it
     expect(configuration.isError).toBe(false);
     expect(configuration.structuredContent).toMatchObject({ runtimeMode: "auto" });
 
-    const pinned = yield* call("t3_thread_organize", {
-      action: "pin",
-      threadId: "other-project-thread",
-    });
-    expect(declaredFailure(pinned)).toMatchObject({ code: "capability_denied" });
+    for (const action of ["pin", "tag", "untag"]) {
+      const organized = yield* call("t3_thread_organize", {
+        action,
+        threadId: "other-project-thread",
+        ...(action === "pin" ? {} : { tag: "Blocked" }),
+      });
+      expect(declaredFailure(organized)).toMatchObject({ code: "capability_denied" });
+    }
     expect(dispatched).toEqual([]);
 
     const configure = yield* call("t3_thread_configure", {

@@ -4,6 +4,7 @@ import {
   EnvironmentId,
   MessageId,
   type OrchestrationV2Command,
+  type OrchestrationV2ServerCommand,
   type OrchestrationV2Run,
   type OrchestrationV2ProviderThread,
   ProviderThreadId,
@@ -108,6 +109,81 @@ const layerDispatchChokepointTest =
       Layer.provide(settingsLayer),
       Layer.provideMerge(layerReceiptsTest),
     );
+
+it.effect("applies only exact defined tags and permits removing absent or legacy tags", () => {
+  const commands: Array<OrchestrationV2ServerCommand> = [];
+  const layerTest = ThreadManagementService.layer.pipe(
+    Layer.provide(Layer.mock(ProviderSessionManager.ProviderSessionManagerV2)({})),
+    Layer.provide(
+      Layer.mock(Orchestrator.OrchestratorV2)({
+        dispatch: (command) =>
+          Effect.sync(() => {
+            commands.push(command);
+            return { sequence: commands.length, storedEvents: [] };
+          }),
+      }),
+    ),
+    Layer.provide(
+      ServerSettings.layerTest({
+        threadTagDefinitions: [
+          { name: "Blocked", color: "#Ab12Ef" },
+          { name: "Review", color: "#123456" },
+        ],
+      }),
+    ),
+    Layer.provide(layerReceiptsTest),
+  );
+  return Effect.gen(function* () {
+    const threads = yield* ThreadManagementService.ThreadManagementService;
+    const common = {
+      type: "thread.tag.set",
+      threadId: ThreadId.make("thread:tag-test"),
+      commandId: CommandId.make("command:tag-test"),
+    } as const;
+    for (const tag of ["blocked", "Later", "section:legacy"]) {
+      const error = yield* Effect.flip(threads.setThreadTag({ ...common, tag, tagged: true }));
+      expect(error).toMatchObject({
+        _tag: "ThreadManagementUnknownTagError",
+        tag,
+        validNames: ["Blocked", "Review"],
+      });
+    }
+    expect(commands).toEqual([]);
+    const accepted = [
+      { ...common, tag: "Blocked", tagged: true },
+      {
+        ...common,
+        commandId: CommandId.make("command:untag-absent"),
+        tag: "Review",
+        tagged: false,
+      },
+      {
+        ...common,
+        commandId: CommandId.make("command:untag-legacy"),
+        tag: "section:legacy",
+        tagged: false,
+      },
+    ];
+    for (const command of accepted) yield* threads.setThreadTag(command);
+    expect(commands).toEqual(accepted);
+  }).pipe(Effect.provide(layerTest));
+});
+
+it.effect("explains where to define tags when the environment has none", () => {
+  return Effect.gen(function* () {
+    const threads = yield* ThreadManagementService.ThreadManagementService;
+    const error = yield* Effect.flip(
+      threads.setThreadTag({
+        type: "thread.tag.set",
+        threadId: ThreadId.make("thread:tag-test"),
+        commandId: CommandId.make("command:tag-test"),
+        tag: "Blocked",
+        tagged: true,
+      }),
+    );
+    expect(error.message).toContain("No tags are defined. Create tags in Settings → Tags first.");
+  }).pipe(Effect.provide(layerDispatchChokepointTest(ServerSettings.layerTest())([])));
+});
 
 it.effect(
   "the dispatch chokepoint refuses a continuation message.dispatch on a project-disabled instance before reaching the orchestrator",
