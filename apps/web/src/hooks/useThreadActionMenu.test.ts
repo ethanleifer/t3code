@@ -44,6 +44,7 @@ vi.mock("../rpc/atomRegistry", () => ({
   appAtomRegistry: { get: (id: string) => state.granted.has(id) },
 }));
 vi.mock("../components/CustomSnoozeDialog", () => ({ requestCustomSnooze: vi.fn() }));
+vi.mock("../components/SectionNameDialog", () => ({ resolveSectionMenuChoice: vi.fn() }));
 vi.mock("react", () => ({
   useCallback: (callback: unknown) => callback,
   useMemo: (factory: () => unknown) => factory(),
@@ -64,12 +65,13 @@ vi.mock("../state/entities", () => ({
     environmentId: "secondary",
     projectId: "project",
     title: "Thread",
-    source: {},
     branch: "main",
     worktreePath: null,
     runtime: null,
     latestRun: null,
+    source: { tags: [] },
   }),
+  readThreadShells: () => [],
   useProjects: () => [{ id: "project", environmentId: "secondary" }],
 }));
 vi.mock("../state/environments", () => ({ usePrimaryEnvironmentId: () => "primary" }));

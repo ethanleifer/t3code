@@ -18,6 +18,8 @@ export type ThreadActionMenuId =
   | "auto-settle:disabled"
   | "snooze"
   | `snooze:${string}`
+  | "section"
+  | `section:${string}`
   | "unsnooze"
   | "rename"
   | "regenerate-title"
@@ -98,6 +100,51 @@ export interface ThreadActionMenuState {
   readonly canShareWithGuest?: boolean;
   /** A No project thread with its own folder, on a server that can promote it. */
   readonly canTurnIntoProject?: boolean;
+  readonly sections?: {
+    readonly current: string | null;
+    readonly names: ReadonlyArray<string>;
+  };
+}
+
+export type SectionMenuChoice =
+  | { readonly kind: "set"; readonly name: string }
+  | { readonly kind: "new" }
+  | { readonly kind: "remove" };
+
+export function buildSectionMenuItem(input: {
+  readonly label: string;
+  /** Checked in the list; null when the thread, or the whole selection, shares no section. */
+  readonly current: string | null;
+  readonly names: ReadonlyArray<string>;
+  readonly canRemove: boolean;
+}): ContextMenuItem<"section" | `section:${string}`> {
+  return {
+    id: "section",
+    label: input.label,
+    icon: "folder",
+    children: [
+      ...input.names.map((name) => ({
+        id: `section:set:${name}` as const,
+        label: name,
+        checked: name === input.current,
+      })),
+      {
+        id: "section:new" as const,
+        label: "New section…",
+        separatorBefore: input.names.length > 0,
+      },
+      ...(input.canRemove ? [{ id: "section:remove" as const, label: "Remove from section" }] : []),
+    ],
+  };
+}
+
+export function parseSectionMenuAction(action: string): SectionMenuChoice | null {
+  if (action === "section:new") return { kind: "new" };
+  if (action === "section:remove") return { kind: "remove" };
+  if (action.startsWith("section:set:")) {
+    return { kind: "set", name: action.slice("section:set:".length) };
+  }
+  return null;
 }
 
 /** Local navigation, read markers, and copying remain available to read-only clients. */
@@ -169,6 +216,16 @@ export function buildThreadActionMenuItems(
                   },
                 ],
               },
+        ]
+      : []),
+    ...(state.sections
+      ? [
+          buildSectionMenuItem({
+            label: "Section",
+            current: state.sections.current,
+            names: state.sections.names,
+            canRemove: state.sections.current !== null,
+          }),
         ]
       : []),
     { id: "rename", label: "Rename thread", icon: "pencil", separatorBefore: true },

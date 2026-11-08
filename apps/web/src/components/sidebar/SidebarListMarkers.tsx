@@ -145,3 +145,5 @@ export function SidebarSectionHeader(props: {
     </SortableSidebarMarker>
   );
 }
+
+/** Labels where a user section starts inside a shelf. Not sortable: rows carry the order. */
