@@ -33,7 +33,7 @@ import { visibleThreadPullRequests } from "@t3tools/shared/threadPullRequests";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Effect from "effect/Effect";
 
-import { getInitialServerConfig, request } from "../rpc/client.ts";
+import { getInitialServerConfig, request, requestGuarded } from "../rpc/client.ts";
 
 interface CommandMetadata {
   readonly commandId?: CommandId;
@@ -277,7 +277,7 @@ const allocateCommandId = Effect.fn("EnvironmentCommands.allocateCommandId")(fun
 });
 
 const dispatch = (command: OrchestrationV2Command) =>
-  request(ORCHESTRATION_V2_WS_METHODS.dispatchCommand, command);
+  requestGuarded(ORCHESTRATION_V2_WS_METHODS.dispatchCommand, command);
 
 const getProjection = (threadId: ThreadId) =>
   request(ORCHESTRATION_V2_WS_METHODS.getThreadProjection, { threadId });
@@ -507,6 +507,12 @@ export const pinThread = Effect.fn("EnvironmentCommands.pinThread")(function* (
     threadId: input.threadId,
     ...(input.orderKey === undefined ? {} : { orderKey: input.orderKey }),
   });
+});
+
+export const setThreadTag = Effect.fn("EnvironmentCommands.setThreadTag")(function* (
+  input: Extract<OrchestrationV2Command, { type: "thread.tag.set" }>,
+) {
+  return yield* dispatch(input);
 });
 
 export interface SetThreadAutoSettleInput extends ThreadCommandInput {

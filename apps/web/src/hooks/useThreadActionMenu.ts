@@ -13,6 +13,9 @@ import {
   type ScopedThreadRef,
   type ThreadId,
 } from "@t3tools/contracts";
+import { buildThreadTagMenu, threadTagAction } from "../components/threadTagMenu";
+import { useSetThreadTag } from "./useSetThreadTag";
+import { appAtomRegistry } from "../rpc/atomRegistry";
 import { useRouter } from "@tanstack/react-router";
 
 import { pickSnoozePreset, resolveSnoozePresets } from "../components/Sidebar.snooze";
@@ -28,6 +31,7 @@ import { threadEnvironment } from "../state/threads";
 import { useOrchestrationCommand } from "../state/use-orchestration-command";
 import { readEnvironmentScope } from "../state/session";
 import {
+  useServerConfigs,
   readEnvironmentServerConfigLoaded,
   readEnvironmentSupportsAutoSettleOptOut,
   readThreadShell,
@@ -67,6 +71,8 @@ export function useThreadActionMenu(input: {
 }) {
   const { threadRef, projectCwd, onStartRename, onFind, canShareWithGuest } = input;
   const router = useRouter();
+  const serverConfigs = useServerConfigs();
+  const setThreadTag = useSetThreadTag();
   const projects = useProjects();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const projectGroupingSettings = useClientSettings(selectProjectGroupingSettings);
@@ -134,6 +140,16 @@ export function useThreadActionMenu(input: {
       const isRegeneratingTitle = thread.titleRegeneration != null;
       const snoozePresets = resolveSnoozePresets(now, timestampFormat, threadRef.environmentId);
       const items = buildThreadActionMenuItems({
+        tagMenu: buildThreadTagMenu([
+          {
+            definitions:
+              serverConfigs.get(threadRef.environmentId)?.settings.threadTagDefinitions ?? [],
+            tags: thread.source.tags ?? [],
+            canTag: appAtomRegistry.get(
+              threadEnvironment.setTag.permissionAtom(threadRef.environmentId),
+            ),
+          },
+        ]),
         canOperate: readEnvironmentScope(threadRef.environmentId, AuthOrchestrationOperateScope),
         canFind: onFind !== undefined,
         branch: thread.branch ?? null,
@@ -161,6 +177,18 @@ export function useThreadActionMenu(input: {
           "Thread action unavailable",
           new Error("This connection cannot change threads."),
         );
+        return;
+      }
+      if (action === "manage-tags") {
+        void router.navigate({
+          to: "/settings/tags",
+          search: { machine: threadRef.environmentId },
+        });
+        return;
+      }
+      const tagAction = threadTagAction(action);
+      if (tagAction) {
+        await setThreadTag(threadRef, tagAction);
         return;
       }
       if (action.startsWith("snooze:")) {

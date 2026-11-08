@@ -30,7 +30,18 @@ export const ThreadTagDefinition = Schema.Struct({
 });
 export type ThreadTagDefinition = typeof ThreadTagDefinition.Type;
 
-const MAX_THREAD_TAG_DEFINITIONS = 100;
+export const MAX_THREAD_TAG_DEFINITIONS = 100;
+
+export const THREAD_TAG_COLOR_PRESETS = [
+  "#3b82f6",
+  "#8b5cf6",
+  "#ec4899",
+  "#ef4444",
+  "#f97316",
+  "#eab308",
+  "#22c55e",
+  "#14b8a6",
+] as const satisfies readonly ThreadTagColor[];
 
 export const ThreadTagDefinitions = Schema.Array(ThreadTagDefinition).check(
   Schema.isMaxLength(MAX_THREAD_TAG_DEFINITIONS),

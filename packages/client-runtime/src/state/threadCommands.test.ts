@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import {
   CommandId,
+  AuthOrchestrationOperateScope,
   RuntimeRequestId,
   EnvironmentId,
   MessageId,
@@ -23,12 +24,13 @@ import * as Option from "effect/Option";
 import * as Queue from "effect/Queue";
 import * as Scope from "effect/Scope";
 import * as SubscriptionRef from "effect/SubscriptionRef";
-import { Atom, AtomRegistry } from "effect/reactivity";
+import { Atom, AtomRegistry, AsyncResult } from "effect/reactivity";
 
 import * as EnvironmentRegistry from "../connection/registry.ts";
 import { BearerConnectionTarget } from "../connection/model.ts";
 import * as EnvironmentSupervisor from "../connection/supervisor.ts";
 import type { RpcSession } from "../rpc/session.ts";
+import { createEnvironmentSessionAtoms } from "./session.ts";
 import { createThreadEnvironmentAtoms } from "./threadCommands.ts";
 import * as ThreadHistoryController from "./threadHistoryController.ts";
 
@@ -139,7 +141,25 @@ const makeHarness = Effect.fn("TestThreadCommands.makeHarness")(function* (optio
   );
   const snapshotAtom = Atom.family((_environmentId: EnvironmentId) => Atom.make(SNAPSHOT));
   const commands = createThreadEnvironmentAtoms(runtime, snapshotAtom);
-  const registry = AtomRegistry.make();
+  const registry = AtomRegistry.make({
+    initialValues: [
+      [
+        createEnvironmentSessionAtoms(runtime).sessionStateAtom(ENVIRONMENT_ID),
+        AsyncResult.success({
+          authenticated: true,
+          auth: {
+            policy: "remote-reachable",
+            bootstrapMethods: [],
+            sessionMethods: [],
+            sessionCookieName: "test",
+          },
+          scopes: [AuthOrchestrationOperateScope],
+          permissions: [AuthOrchestrationOperateScope],
+        }),
+        { skipInitialRun: true },
+      ],
+    ],
+  });
   yield* Effect.addFinalizer(() => Effect.sync(() => registry.dispose()));
   const visibleAtom = commands.snapshotAtom(ENVIRONMENT_ID);
   registry.mount(visibleAtom);
@@ -263,6 +283,12 @@ describe("remote thread lifecycle commands", () => {
     ["unsnooze", { reason: "user" }, { snoozedUntil: null, snoozedAt: null }],
     ["pin", { orderKey: "a" }, { pinnedAt: expect.any(Object), pinOrderKey: "a" }],
     ["unpin", {}, { pinnedAt: null, pinOrderKey: null }],
+    [
+      "setTag",
+      { type: "thread.tag.set", tag: "Review", tagged: true },
+      { tags: ["section:legacy", "Review"] },
+    ],
+    ["setTag", { type: "thread.tag.set", tag: "section:legacy", tagged: false }, { tags: [] }],
     ["setAutoSettle", { enabled: false }, { autoSettleDisabledAt: expect.any(Object) }],
     ["reorderPin", { orderKey: "b" }, { pinOrderKey: "b" }],
     ["reorderActive", { orderKey: "b" }, { activeOrderKey: "b" }],
@@ -279,6 +305,7 @@ describe("remote thread lifecycle commands", () => {
           threads: [
             {
               ...SNAPSHOT.threads[0]!,
+              tags: ["section:legacy"],
               ...(action === "unsettle" || action === "pin"
                 ? { settledOverride: "settled" as const, settledAt: NOW }
                 : {}),
@@ -297,6 +324,9 @@ describe("remote thread lifecycle commands", () => {
           input: {
             threadId: THREAD_ID,
             commandId: CommandId.make(action),
+            type: "thread.tag.set",
+            tag: "Review",
+            tagged: true,
             reason: "user",
             enabled: false,
             orderKey: "a",

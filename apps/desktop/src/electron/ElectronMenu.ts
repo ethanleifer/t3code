@@ -1,4 +1,4 @@
-import type { ContextMenuItem } from "@t3tools/contracts";
+import type { ContextMenuItem, ThreadTagColor } from "@t3tools/contracts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -80,6 +80,7 @@ function normalizeContextMenuItems(source: readonly ContextMenuItem[]): ContextM
       disabled: sourceItem.disabled === true,
       ...(sourceItem.separatorBefore === true ? { separatorBefore: true } : {}),
       ...(typeof sourceItem.checked === "boolean" ? { checked: sourceItem.checked } : {}),
+      ...(sourceItem.swatch === undefined ? {} : { swatch: sourceItem.swatch }),
     };
 
     if (sourceItem.children) {
@@ -94,6 +95,32 @@ function normalizeContextMenuItems(source: readonly ContextMenuItem[]): ContextM
   }
 
   return normalizedItems;
+}
+
+// A 12pt dot at 2x, as premultiplied BGRA pixels.
+function drawSwatch(color: ThreadTagColor): Electron.NativeImage {
+  const red = Number.parseInt(color.slice(1, 3), 16);
+  const green = Number.parseInt(color.slice(3, 5), 16);
+  const blue = Number.parseInt(color.slice(5, 7), 16);
+  const size = 24;
+  const radius = 8;
+  const pixels = Buffer.alloc(size * size * 4);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const distance = Math.hypot(x + 0.5 - size / 2, y + 0.5 - size / 2);
+      const alpha = Math.min(1, Math.max(0, radius - distance + 0.5));
+      const offset = (y * size + x) * 4;
+      pixels[offset] = Math.round(blue * alpha);
+      pixels[offset + 1] = Math.round(green * alpha);
+      pixels[offset + 2] = Math.round(red * alpha);
+      pixels[offset + 3] = Math.round(255 * alpha);
+    }
+  }
+  return Electron.nativeImage.createFromBitmap(pixels, {
+    width: size,
+    height: size,
+    scaleFactor: 2,
+  });
 }
 
 // popup() takes window points; renderer CSS coordinates must account for page zoom.
@@ -113,7 +140,6 @@ const normalizePosition = (
 export const make = Effect.gen(function* () {
   const platform = yield* HostProcess.Platform;
   let destructiveMenuIconCache: Option.Option<Electron.NativeImage> | undefined;
-
   const getDestructiveMenuIcon = (): Option.Option<Electron.NativeImage> => {
     if (platform !== "darwin") {
       return Option.none();
@@ -172,6 +198,9 @@ export const make = Effect.gen(function* () {
         itemOption.submenu = buildTemplate(item.children, complete);
       } else {
         itemOption.click = () => complete(Option.some(item.id));
+      }
+      if (item.swatch !== undefined) {
+        itemOption.icon = drawSwatch(item.swatch);
       }
       if (item.destructive && (!item.children || item.children.length === 0)) {
         const destructiveIcon = getDestructiveMenuIcon();

@@ -471,6 +471,12 @@ export function showContextMenuFallback<T extends string>(
             button.appendChild(icon);
           }
         }
+        if (item.swatch !== undefined) {
+          const swatch = document.createElement("span");
+          swatch.setAttribute("aria-hidden", "true");
+          swatch.style.cssText = `width:0.625rem;height:0.625rem;flex-shrink:0;border-radius:9999px;background:${item.swatch};`;
+          button.appendChild(swatch);
+        }
 
         const label = document.createElement("span");
         label.className = "min-w-0 flex-1 truncate";

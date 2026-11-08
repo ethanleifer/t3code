@@ -1,7 +1,9 @@
+import type { ThreadTagMenuId } from "./threadTagMenu";
 import type { ContextMenuItem } from "@t3tools/contracts";
 import type { SnoozePreset } from "@t3tools/client-runtime/state/thread-settled";
 
 export type ThreadActionMenuId =
+  | ThreadTagMenuId
   | "find"
   | "new-thread-on-branch"
   | "filter-by-project"
@@ -68,6 +70,7 @@ export function buildDraftActionMenuItems(options: {
 }
 
 export interface ThreadActionMenuState {
+  readonly tagMenu?: ContextMenuItem<ThreadTagMenuId>;
   readonly canOperate: boolean;
   readonly canFind?: boolean;
   readonly branch: string | null;
@@ -100,6 +103,8 @@ export interface ThreadActionMenuState {
 /** Local navigation, read markers, and copying remain available to read-only clients. */
 export function threadActionRequiresOperate(action: ThreadActionMenuId): boolean {
   return ![
+    "manage-tags",
+    "tags",
     "find",
     "new-thread-on-branch",
     "project-settings",
@@ -223,6 +228,7 @@ export function buildThreadActionMenuItems(
           },
         ]
       : []),
+    ...(state.tagMenu ? [state.tagMenu] : []),
     {
       id: "copy",
       label: "Copy",
