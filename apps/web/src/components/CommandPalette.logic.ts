@@ -2,9 +2,11 @@ import {
   foldSearchQuery,
   PALETTE_SECONDARY_LIMIT,
   PALETTE_THREAD_LIMIT,
+  parseThreadTagQuery,
   rankSearchGroups,
   scoreSearchTerms,
   scoreThreadSearch,
+  threadHasTags,
   type SearchMatchHint,
   type SearchRange,
   type ThreadSearchSubject,
@@ -414,7 +416,12 @@ export type BuildThreadActionItemsThread = Pick<
   Partial<
     Pick<
       SidebarThreadSummary,
-      "pullRequests" | "linkedPullRequest" | "branchPullRequest" | "opens" | "latestUserMessageAt"
+      | "pullRequests"
+      | "linkedPullRequest"
+      | "branchPullRequest"
+      | "opens"
+      | "latestUserMessageAt"
+      | "tags"
     >
   > & {
     updatedAt: string;
@@ -570,6 +577,33 @@ export function filterCommandPaletteGroups(input: {
 
   const isActionsFilter = input.query.startsWith(">");
   const searchQuery = isActionsFilter ? input.query.slice(1) : input.query;
+  const tagQuery = parseThreadTagQuery(searchQuery);
+  if (tagQuery.tags.length > 0 && !isActionsFilter && !input.isInSubmenu) {
+    // A tag term asks for threads alone; the rest of the query ranks them.
+    const tagged = (items: ReadonlyArray<CommandPaletteActionItem>) =>
+      items.filter((item) => threadHasTags(item.threadSearch?.tags, tagQuery.tags));
+    const threadSearchItems = tagged(input.threadSearchItems);
+    if (tagQuery.text.length === 0) {
+      return threadSearchItems.length === 0
+        ? []
+        : [
+            {
+              value: "threads-search",
+              label: "Threads",
+              items: threadSearchItems.slice(0, PALETTE_THREAD_LIMIT),
+            },
+          ];
+    }
+    return filterCommandPaletteGroups({
+      activeGroups: [],
+      query: tagQuery.text,
+      isInSubmenu: false,
+      projectSearchItems: [],
+      threadSearchItems,
+      threadMessageItems: tagged(input.threadMessageItems ?? []),
+      ...(input.now === undefined ? {} : { now: input.now }),
+    });
+  }
   const normalizedQuery = foldSearchQuery(searchQuery);
 
   if (normalizedQuery.length === 0) {

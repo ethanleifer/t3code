@@ -183,6 +183,7 @@ export interface EnvironmentThreadShell {
   readonly autoSettleDisabledAt?: string | null;
   readonly pinOrderKey: string | null;
   readonly activeOrderKey: string | null;
+  readonly tags?: OrchestrationV2ThreadShell["tags"];
   readonly pullRequests: ReadonlyArray<import("@t3tools/contracts").ThreadPullRequestLink>;
   readonly linkedPullRequest?: ThreadLinkedPullRequest | null;
   readonly branchPullRequest?: ThreadLinkedPullRequest | null;
@@ -292,6 +293,7 @@ export function presentThreadShell(
     interactionMode: thread.interactionMode,
     branch: thread.branch,
     worktreePath: thread.worktreePath,
+    tags: thread.tags ?? [],
     pullRequests: threadPullRequestsOf(thread),
     linkedPullRequest: thread.linkedPullRequest ?? null,
     branchPullRequest: thread.branchPullRequest ?? null,

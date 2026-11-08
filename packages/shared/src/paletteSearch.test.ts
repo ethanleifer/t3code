@@ -9,6 +9,7 @@ import {
   rankSearchItems,
   recordThreadOpen,
   messageMatcher,
+  parseThreadTagQuery,
   scoreSearchTerms,
   scoreThreadSearch,
   SEARCH_RECENCY_HALF_LIFE_MS,
@@ -802,5 +803,28 @@ describe("scoreMessageMatch", () => {
     ] as const) {
       expect(scoreMessageMatch(text, query), `${query} in ${text}`).toEqual(expected);
     }
+  });
+});
+
+describe("parseThreadTagQuery", () => {
+  it.each([
+    ["no tag term", "fix login", [], "fix login"],
+    ["a bare tag", "tag:review", ["review"], ""],
+    ["a quoted tag with spaces", 'tag:"waiting on review"', ["waiting on review"], ""],
+    ["an unclosed quote", 'tag:"waiting on', ["waiting on"], ""],
+    ["several tags, once each", "tag:a tag:B tag:a", ["a", "B"], ""],
+    [
+      "tags mixed with text",
+      'fix tag:review login tag:"on hold"',
+      ["review", "on hold"],
+      "fix login",
+    ],
+    ["an empty tag", "tag: fix", [], "fix"],
+    ["empty quotes", 'tag:"" fix', [], "fix"],
+    ["tag inside a word", "pretag:x", [], "pretag:x"],
+    ["ordinary whitespace", "fix  pretag:x", [], "fix  pretag:x"],
+    ["legacy tag", "tag:section:old", ["section:old"], ""],
+  ])("reads %s", (_name, query, tags, text) => {
+    expect(parseThreadTagQuery(query)).toEqual({ tags, text });
   });
 });

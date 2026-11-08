@@ -818,9 +818,39 @@ export interface ThreadSearchSubject {
     /** Values such as URLs, matched only by the whole query. */
     readonly references?: ReadonlyArray<string>;
   }>;
+  /** Matched only by `tag:` terms; see `parseThreadTagQuery`. */
+  readonly tags?: ReadonlyArray<string>;
   /** Latest user activity, in epoch ms. */
   readonly activityAt: number | null;
   readonly opens?: ThreadOpenStats | null;
+}
+
+const TAG_TERM = /(^|\s)tag:(?:"([^"]*)"?|(\S*))/giu;
+
+/**
+ * Splits `tag:review` and `tag:"waiting on review"` terms out of a thread
+ * search. Tags keep their case, as they match by exact spelling; an empty
+ * `tag:` names no tag. A query with no tag term comes back unchanged.
+ */
+export function parseThreadTagQuery(query: string): {
+  readonly tags: ReadonlyArray<string>;
+  readonly text: string;
+} {
+  if (!/(^|\s)tag:/iu.test(query)) return { tags: [], text: query };
+  const tags: string[] = [];
+  const text = query.replace(TAG_TERM, (_term, lead: string, quoted?: string, bare?: string) => {
+    const tag = (quoted ?? bare ?? "").trim();
+    if (tag !== "" && !tags.includes(tag)) tags.push(tag);
+    return lead;
+  });
+  return { tags, text: text.trim().replace(/\s+/gu, " ") };
+}
+
+export function threadHasTags(
+  threadTags: ReadonlyArray<string> | undefined,
+  tags: ReadonlyArray<string>,
+): boolean {
+  return tags.every((tag) => threadTags?.includes(tag) === true);
 }
 
 // Use reorders matches of about the same quality but never turns a mid-word

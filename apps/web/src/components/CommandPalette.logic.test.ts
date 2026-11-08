@@ -219,6 +219,42 @@ describe("buildThreadActionItems", () => {
     ]);
   });
 
+  it("narrows threads to a tag term and ranks them by the rest of the query", () => {
+    const items = buildThreadActionItems({
+      threads: [
+        makeThread({
+          id: ThreadId.make("both"),
+          title: "Fix login",
+          tags: ["review", "on hold", "section:old"],
+        }),
+        makeThread({ id: ThreadId.make("review"), title: "Fix signup", tags: ["review"] }),
+        makeThread({ id: ThreadId.make("untagged"), title: "Fix login form" }),
+      ],
+      projectByKey: new Map(),
+      icon: null,
+      runThread: async () => undefined,
+    });
+    const filter = (query: string) =>
+      filterCommandPaletteGroups({
+        activeGroups: [],
+        query,
+        isInSubmenu: false,
+        projectSearchItems: [],
+        threadSearchItems: items,
+        threadMessageItems: items,
+      }).map((group) => [group.label, group.items.map((item) => item.value)]);
+
+    expect(filter("tag:review")).toEqual([
+      ["Threads", ["thread:environment-local:both", "thread:environment-local:review"]],
+    ]);
+    expect(filter('login tag:"on hold"')).toEqual([["Threads", ["thread:environment-local:both"]]]);
+    expect(filter("tag:Review")).toEqual([]);
+    expect(filter('tag:review tag:"on hold"')).toEqual([
+      ["Threads", ["thread:environment-local:both"]],
+    ]);
+    expect(filter("tag:section:old")).toEqual([["Threads", ["thread:environment-local:both"]]]);
+  });
+
   it("searches submenu options from the root and from a submenu with no match", () => {
     const action = (value: string, title: string) => ({
       kind: "action" as const,

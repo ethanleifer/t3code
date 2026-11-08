@@ -18,6 +18,9 @@ import {
   resolveThreadStatusPill,
   resolveWorkingStartedAt,
   searchSidebarThreads,
+  resolveSidebarTagFilter,
+  filterSidebarThreadsByTags,
+  mergeThreadTagDefinitions,
   shouldRecedeSidebarThread,
   sortInboxThreadsByReturn,
   resolveSidebarDropTarget,
@@ -344,6 +347,79 @@ describe("searchSidebarThreads", () => {
         contentMatches: [threads[1]],
       },
     );
+  });
+
+  it("narrows titles and messages to `tag:` terms, and lists tagged threads for tags alone", () => {
+    const tagged = [
+      { ...threads[0]!, tags: ["review", "waiting on review"] },
+      { ...threads[1]!, tags: ["review"] },
+      { ...threads[2]!, tags: ["Review"] },
+      threads[3]!,
+    ];
+    const search = (query: string) =>
+      searchSidebarThreads(tagged, query, contentKeys("thread-1", "thread-2", "thread-3"), now);
+    expect(search("tag:review")).toEqual({
+      titleMatches: [tagged[0], tagged[1]],
+      contentMatches: [],
+    });
+    expect(search('work tag:"waiting on review"')).toEqual({
+      titleMatches: [tagged[0]],
+      contentMatches: [],
+    });
+    expect(search("work tag:review")).toEqual({
+      titleMatches: [tagged[0]],
+      contentMatches: [tagged[1]],
+    });
+  });
+});
+
+describe("sidebar tag filter", () => {
+  const definitions = [
+    { name: "review", color: "#3b82f6" },
+    { name: "on hold", color: "#a1a1aa" },
+  ];
+
+  it("merges definitions by exact name and keeps the first environment's hex color", () => {
+    expect(
+      mergeThreadTagDefinitions([
+        [{ name: "review", color: "#Ab12Cd" }],
+        [
+          { name: "review", color: "#000000" },
+          { name: "Review", color: "#FFFFFF" },
+        ],
+      ]),
+    ).toEqual([
+      { name: "review", color: "#Ab12Cd" },
+      { name: "Review", color: "#FFFFFF" },
+    ]);
+  });
+
+  it("keeps only selected tags that are still defined", () => {
+    expect(resolveSidebarTagFilter([], definitions, true)).toBeNull();
+    expect(resolveSidebarTagFilter(["gone", "review"], [], false)).toEqual(["gone", "review"]);
+    expect(resolveSidebarTagFilter(["gone", "review"], definitions, false)).toEqual([
+      "gone",
+      "review",
+    ]);
+    expect(resolveSidebarTagFilter(["gone"], definitions, true)).toBeNull();
+    expect(resolveSidebarTagFilter(["gone", "on hold", "review"], definitions, true)).toEqual([
+      "on hold",
+      "review",
+    ]);
+  });
+
+  it("shows only threads that carry every selected tag", () => {
+    const both = { id: "both", tags: ["review", "on hold"] };
+    const review = { id: "review", tags: ["review"] };
+    const untagged = { id: "untagged", tags: undefined };
+    expect(filterSidebarThreadsByTags([both, review], ["Review"])).toEqual([]);
+    expect(filterSidebarThreadsByTags([{ tags: ["section:old"] }], ["section:old"])).toHaveLength(
+      1,
+    );
+    const threads = [both, review, untagged];
+    expect(filterSidebarThreadsByTags(threads, null)).toBe(threads);
+    expect(filterSidebarThreadsByTags(threads, ["review"])).toEqual([both, review]);
+    expect(filterSidebarThreadsByTags(threads, ["review", "on hold"])).toEqual([both]);
   });
 });
 
