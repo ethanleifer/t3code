@@ -3504,16 +3504,17 @@ describe("OrchestratorMcpService thread list", () => {
     capabilities: new Set(["orchestration"]),
     issuedAt: 1,
   };
-  const shell = (id: string, projectId: string, snoozed: boolean) => ({
+  const shell = (id: string, projectId: string, snoozed: boolean, tags: Array<string> = []) => ({
     ...liveThreadShell(ThreadId.make(id)),
     projectId: ProjectId.make(projectId),
     status: "completed" as const,
     snoozedUntil: snoozed ? DateTime.makeUnsafe("2099-01-01T00:00:00Z") : null,
+    tags,
   });
   const shells = [
-    shell("thread:a-snoozed", "project:a", true),
+    shell("thread:a-snoozed", "project:a", true, ["Blocked", "Review"]),
     shell("thread:a-awake", "project:a", false),
-    shell("thread:b-snoozed", "project:b", true),
+    shell("thread:b-snoozed", "project:b", true, ["Blocked", "section:legacy"]),
   ];
   const service = layerOrchestratorService.pipe(
     Layer.provide(
@@ -3557,6 +3558,36 @@ describe("OrchestratorMcpService thread list", () => {
           ["thread:b-snoozed", "project:b"],
         ],
       );
+    }).pipe(Effect.provide(service)),
+  );
+
+  it.effect("keeps threads carrying every requested tag and shows only nonempty tags", () =>
+    Effect.gen(function* () {
+      const mcp = yield* OrchestratorMcpService.OrchestratorMcpService;
+      const tagged = yield* mcp.listThreads(client, {
+        allProjects: true,
+        tags: ["Blocked", "Review"],
+      });
+      assert.deepStrictEqual(
+        tagged.threads.map((thread) => thread.threadId),
+        ["thread:a-snoozed"],
+      );
+      assert.deepStrictEqual(tagged.threads[0]?.tags, ["Blocked", "Review"]);
+      const all = yield* mcp.listThreads(client, { allProjects: true });
+      assert.isUndefined(all.threads.find((thread) => thread.threadId === "thread:a-awake")?.tags);
+      const legacy = yield* mcp.listThreads(client, {
+        allProjects: true,
+        tags: ["section:legacy"],
+        limit: 1,
+      });
+      assert.deepStrictEqual(
+        legacy.threads.map((thread) => thread.threadId),
+        ["thread:b-snoozed"],
+      );
+      const wrongCase = yield* mcp.listThreads(client, { allProjects: true, tags: ["blocked"] });
+      assert.deepStrictEqual(wrongCase.threads, []);
+      const empty = yield* mcp.listThreads(client, { allProjects: true, tags: [] });
+      assert.deepStrictEqual(empty.threads, all.threads);
     }).pipe(Effect.provide(service)),
   );
 });

@@ -359,6 +359,28 @@ export const layer = McpToolAccess.toLayer(ThreadToolkit, {
         case "mark_unread":
           command = { ...common, type: "thread.mark-unread" };
           break;
+        case "tag":
+        case "untag": {
+          const tag = yield* required(input.tag, "tag");
+          const result = yield* threads
+            .setThreadTag({
+              ...common,
+              type: "thread.tag.set",
+              tag,
+              tagged: input.action === "tag",
+            })
+            .pipe(
+              Effect.catchTags({
+                ThreadManagementUnknownTagError: (error) =>
+                  new OrchestratorMcpFailure({ code: "invalid_request", message: error.message }),
+                ServerSettingsError: unavailable,
+              }),
+              Effect.mapError((error) =>
+                error._tag === "OrchestratorMcpFailure" ? error : dispatchFailure(error),
+              ),
+            );
+          return { sequence: result.sequence };
+        }
         default:
           command = { ...common, type: `thread.${input.action}` };
       }

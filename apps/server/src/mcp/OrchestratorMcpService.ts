@@ -795,6 +795,9 @@ function threadPullRequests(
   }));
 }
 
+const threadTags = (tags: ReadonlyArray<string> | undefined) =>
+  tags === undefined || tags.length === 0 ? {} : { tags };
+
 function listItemFromShell(
   scope: McpInvocationScope,
   shell: OrchestrationV2ThreadShell,
@@ -815,6 +818,7 @@ function listItemFromShell(
     interactionMode: shell.interactionMode,
     linkedPullRequest: shell.linkedPullRequest ?? null,
     pullRequests: threadPullRequests(shell.pullRequests),
+    ...threadTags(shell.tags),
     ...threadSettlement(shell),
     ...threadSnooze(shell, nowMs),
     parentThreadId: shell.lineage.parentThreadId,
@@ -850,6 +854,7 @@ function threadDetail(
     interactionMode: projection.thread.interactionMode,
     linkedPullRequest: projection.thread.linkedPullRequest ?? null,
     pullRequests: threadPullRequests(projection.thread.pullRequests),
+    ...threadTags(projection.thread.tags),
     titleRegeneration:
       projection.thread.titleRegeneration === undefined ||
       projection.thread.titleRegeneration === null
@@ -3003,6 +3008,7 @@ const make = Effect.gen(function* () {
           ? null
           : new Set(input.statuses);
       const titleContains = input.titleContains?.toLocaleLowerCase();
+      const tags = input.tags ?? [];
       const filtered = projectThreads
         .filter(
           (thread) => statuses === null || statuses.has(thread.activityRunStatus ?? thread.status),
@@ -3017,7 +3023,8 @@ const make = Effect.gen(function* () {
         .filter(
           (thread) =>
             titleContains === undefined || thread.title.toLocaleLowerCase().includes(titleContains),
-        );
+        )
+        .filter((thread) => tags.every((tag) => thread.tags?.includes(tag) === true));
       const cursor = input.cursor ?? 0;
       const limit = input.limit ?? DEFAULT_THREAD_LIST_LIMIT;
       const page = filtered.slice(cursor, cursor + limit);

@@ -38,6 +38,7 @@ import {
   resolveProjectProviderInstanceEnabled,
   RunId,
   type ScheduledTaskId,
+  type ServerSettingsError,
   ThreadId,
   type TurnItemId,
 } from "@t3tools/contracts";
@@ -217,6 +218,17 @@ export class ThreadManagementThreadNotFoundError extends Schema.TaggedError<Thre
   }
 }
 
+export class ThreadManagementUnknownTagError extends Schema.TaggedError<ThreadManagementUnknownTagError>()(
+  "ThreadManagementUnknownTagError",
+  { tag: Schema.String, validNames: Schema.Array(Schema.String) },
+) {
+  override get message(): string {
+    return this.validNames.length === 0
+      ? "No tags are defined. Create tags in Settings → Tags first."
+      : `Unknown tag ${JSON.stringify(this.tag)}. Valid tag names: ${this.validNames.map((name) => JSON.stringify(name)).join(", ")}.`;
+  }
+}
+
 export class ThreadTranscriptTooLargeError extends Schema.TaggedError<ThreadTranscriptTooLargeError>()(
   "ThreadTranscriptTooLargeError",
   { threadId: ThreadId },
@@ -374,6 +386,15 @@ export interface ThreadManagementServiceShape {
   ) => Effect.Effect<
     Orchestrator.OrchestratorV2DispatchResult,
     Orchestrator.OrchestratorV2Error | ThreadManagementProviderInstanceDisabledError
+  >;
+  readonly setThreadTag: (
+    command: Extract<OrchestrationV2Command, { readonly type: "thread.tag.set" }>,
+  ) => Effect.Effect<
+    Orchestrator.OrchestratorV2DispatchResult,
+    | Orchestrator.OrchestratorV2Error
+    | ThreadManagementProviderInstanceDisabledError
+    | ThreadManagementUnknownTagError
+    | ServerSettingsError
   >;
   readonly getThreadHistoryPage: Orchestrator.OrchestratorV2["Service"]["getThreadHistoryPage"];
   readonly getTimelinePage: Orchestrator.OrchestratorV2["Service"]["getTimelinePage"];
@@ -756,6 +777,19 @@ const make = Effect.gen(function* () {
       Effect.andThen(assertDispatchTargetEnabled(command)),
       Effect.andThen(orchestrator.dispatch(command)),
     );
+
+  const setThreadTag = Effect.fn("ThreadManagementService.setThreadTag")(function* (
+    command: Extract<OrchestrationV2Command, { readonly type: "thread.tag.set" }>,
+  ) {
+    if (command.tagged) {
+      const { threadTagDefinitions } = yield* serverSettings.getSettings;
+      const validNames = threadTagDefinitions.map((definition) => definition.name);
+      if (!validNames.includes(command.tag)) {
+        return yield* new ThreadManagementUnknownTagError({ tag: command.tag, validNames });
+      }
+    }
+    return yield* dispatch(command);
+  });
 
   const getProjectThreadRecords: ThreadManagementServiceShape["getProjectThreadRecords"] = (
     input,
@@ -1547,6 +1581,7 @@ const make = Effect.gen(function* () {
       );
     }),
     dispatch,
+    setThreadTag,
     getThreadHistoryPage: Effect.fn("ThreadManagementService.getThreadHistoryPage")(
       function (threadId, cursor, throughEntryId, conversationOnly, workMode) {
         return ensureProjectionTranscript(threadId).pipe(
