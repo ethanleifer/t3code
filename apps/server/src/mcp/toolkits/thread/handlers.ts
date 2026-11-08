@@ -21,6 +21,7 @@ import {
 } from "../../threadAccess.ts";
 import * as ThreadSearch from "../../../orchestration-v2/ThreadSearch.ts";
 import * as ScheduledTasks from "../../../scheduledTasks/ScheduledTaskService.ts";
+import * as ServerSettings from "../../../serverSettings.ts";
 import { queuedRunsInDeliveryOrder } from "../../../orchestration-v2/QueuedRunOrder.ts";
 import { ThreadToolkit } from "./tools.ts";
 
@@ -86,6 +87,21 @@ const required = <A>(value: A | undefined, name: string) =>
         }),
       )
     : Effect.succeed(value);
+const requireDefinedTag = Effect.fn("mcp.requireDefinedTag")(function* (tag: string) {
+  const { threadTagDefinitions } = yield* ServerSettings.ServerSettingsService.pipe(
+    Effect.flatMap((settings) => settings.getSettings),
+    Effect.mapError(unavailable),
+  );
+  const names = threadTagDefinitions.map((definition) => definition.name);
+  if (names.includes(tag)) return;
+  return yield* new OrchestratorMcpFailure({
+    code: "invalid_request",
+    message:
+      names.length === 0
+        ? "No tags are defined. Create tags in Settings → Tags first."
+        : `Unknown tag "${tag}". Defined tags: ${names.join(", ")}.`,
+  });
+});
 const writesThread = <P extends { readonly threadId?: ThreadId | undefined }, A, E, R>(
   handle: (params: P) => Effect.Effect<A, E, R>,
 ) => McpToolAccess.writesThreads((params: P) => [params.threadId], handle);
@@ -359,6 +375,13 @@ export const layer = McpToolAccess.toLayer(ThreadToolkit, {
         case "mark_unread":
           command = { ...common, type: "thread.mark-unread" };
           break;
+        case "tag":
+        case "untag": {
+          const tag = yield* required(input.tag, "tag");
+          if (input.action === "tag") yield* requireDefinedTag(tag);
+          command = { ...common, type: "thread.tag.set", tag, tagged: input.action === "tag" };
+          break;
+        }
         default:
           command = { ...common, type: `thread.${input.action}` };
       }

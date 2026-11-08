@@ -19,6 +19,7 @@ import {
   RunId,
   NonNegativeInt,
   ProjectId,
+  ThreadTag,
 } from "@t3tools/contracts";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Schema from "effect/Schema";
@@ -27,11 +28,12 @@ import { Tool, Toolkit } from "effect/ai";
 import * as ThreadSearch from "../../../orchestration-v2/ThreadSearch.ts";
 import * as ScheduledTaskService from "../../../scheduledTasks/ScheduledTaskService.ts";
 import * as ThreadManagementService from "../../../orchestration-v2/ThreadManagementService.ts";
+import * as ServerSettings from "../../../serverSettings.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 
 const ThreadOrganizeTool = Tool.make("t3_thread_organize", {
   description:
-    "Pin, snooze, settle, archive, or mark a thread unread. Omit `threadId` for this thread. `snooze` needs `snoozedUntil`. Settling this thread applies at turn end. A failed turn or queued message leaves it active.",
+    "Pin, snooze, settle, archive, tag, or mark a thread unread. Omit `threadId` for this thread. `snooze` needs `snoozedUntil`. `tag` and `untag` need `tag`, a defined tag name; an unknown tag fails with the defined names. Settling this thread applies at turn end. A failed turn or queued message leaves it active.",
   parameters: Schema.Struct({
     environmentId: OrchestratorMcpEnvironmentTarget,
     threadId: Schema.optional(ThreadId),
@@ -45,8 +47,11 @@ const ThreadOrganizeTool = Tool.make("t3_thread_organize", {
       "archive",
       "unarchive",
       "mark_unread",
+      "tag",
+      "untag",
     ]),
     snoozedUntil: Schema.optional(IsoDateTime),
+    tag: Schema.optional(ThreadTag),
   }),
   success: Schema.Union([
     OrchestrationV2DispatchCommandResult,
@@ -57,6 +62,7 @@ const ThreadOrganizeTool = Tool.make("t3_thread_organize", {
   dependencies: [
     McpInvocationContext.McpInvocationContext,
     ThreadManagementService.ThreadManagementService,
+    ServerSettings.ServerSettingsService,
     SecureRandom.SecureRandom,
   ],
 })

@@ -76,13 +76,16 @@ import { htmlRenderFromToolItem } from "@t3tools/shared/toolOutput";
 const decodeMcpAttachmentInput = Schema.decodeUnknownEffect(McpAttachmentInput);
 const decodeThreadReadResult = Schema.decodeUnknownEffect(OrchestratorMcpThreadReadResult);
 
-const layerThreadToolkit = McpHttpServer.layerThreadToolkit.pipe(
-  Layer.provide(Layer.mock(ThreadSearch.ThreadSearch)({})),
-  Layer.provide(Layer.mock(ScheduledTaskService.ScheduledTaskService)({})),
-  Layer.provide(Layer.mock(PeerForwarding.PeerForwarding)({})),
-  Layer.provide(Layer.mock(PeerLinkRequests.PeerLinkRequests)({})),
-  Layer.provide(Layer.mock(PeerLinks.PeerLinks)({})),
-);
+const layerThreadToolkitWith = (settings: Parameters<typeof ServerSettings.layerTest>[0] = {}) =>
+  McpHttpServer.layerThreadToolkit.pipe(
+    Layer.provide(Layer.mock(ThreadSearch.ThreadSearch)({})),
+    Layer.provide(Layer.mock(ScheduledTaskService.ScheduledTaskService)({})),
+    Layer.provide(Layer.mock(PeerForwarding.PeerForwarding)({})),
+    Layer.provide(Layer.mock(PeerLinkRequests.PeerLinkRequests)({})),
+    Layer.provide(Layer.mock(PeerLinks.PeerLinks)({})),
+    Layer.provide(ServerSettings.layerTest(settings)),
+  );
+const layerThreadToolkit = layerThreadToolkitWith();
 
 const threadId = ThreadId.make("mcp-core-thread");
 const scope: McpInvocationContext.McpInvocationScope = {
@@ -420,6 +423,74 @@ it.effect("rejects an unknown organize target instead of archiving the calling t
     ),
   );
 });
+
+const organize = (args: Record<string, unknown>) =>
+  Effect.flatMap(McpServer.McpServer, (server) =>
+    server.callTool({ name: "t3_thread_organize", arguments: args }),
+  ).pipe(
+    Effect.provideService(McpInvocationContext.McpInvocationContext, scope),
+    Effect.provideService(McpSchema.McpServerClient, client),
+  );
+const organizeToolkit = (
+  settings: Parameters<typeof ServerSettings.layerTest>[0],
+  dispatched: Array<unknown> = [],
+) =>
+  layerThreadToolkitWith(settings).pipe(
+    Layer.provideMerge(McpHttpServer.layerInProcessMcpServer),
+    Layer.provide(NodeCrypto.layer),
+    Layer.provide(
+      Layer.mock(ThreadManagement.ThreadManagementService)({
+        getThreadShell: (id) => Effect.succeed(McpToolAccessTestkit.liveThreadShell(id)),
+        getProjectThreadRecords: ({ threadId: id }) =>
+          Effect.succeed(
+            McpToolAccessTestkit.idleThreadProjection(McpToolAccessTestkit.liveThreadShell(id)),
+          ),
+        dispatch: (command) => {
+          dispatched.push(command);
+          return Effect.succeed({ sequence: 1 } as never);
+        },
+      }),
+    ),
+  );
+
+it.effect("tags and untags a thread only with a defined tag", () => {
+  const dispatched: Array<unknown> = [];
+  return Effect.gen(function* () {
+    expect((yield* organize({ action: "tag", tag: "Blocked" })).isError).not.toBe(true);
+    expect((yield* organize({ action: "untag", tag: "Stale" })).isError).not.toBe(true);
+    expect(declaredFailure(yield* organize({ action: "tag", tag: "Later" }))).toMatchObject({
+      code: "invalid_request",
+      message: 'Unknown tag "Later". Defined tags: Blocked, Review.',
+    });
+    expect(declaredFailure(yield* organize({ action: "tag" }))).toMatchObject({
+      code: "invalid_request",
+    });
+    expect(dispatched).toMatchObject([
+      { type: "thread.tag.set", threadId, tag: "Blocked", tagged: true },
+      { type: "thread.tag.set", threadId, tag: "Stale", tagged: false },
+    ]);
+  }).pipe(
+    Effect.provide(
+      organizeToolkit(
+        {
+          threadTagDefinitions: [
+            { name: "Blocked", color: "red" },
+            { name: "Review", color: "blue" },
+          ],
+        },
+        dispatched,
+      ),
+    ),
+  );
+});
+
+it.effect("points to Settings when no tags are defined", () =>
+  Effect.gen(function* () {
+    expect(declaredFailure(yield* organize({ action: "tag", tag: "Blocked" }))).toMatchObject({
+      message: expect.stringContaining("Settings → Tags"),
+    });
+  }).pipe(Effect.provide(organizeToolkit({}))),
+);
 
 it.effect("keeps unexpected handler defects private through the production registration", () =>
   Effect.gen(function* () {
@@ -795,6 +866,7 @@ it.effect.each([
         Layer.provide(Layer.mock(PeerForwarding.PeerForwarding)({})),
         Layer.provide(Layer.mock(PeerLinkRequests.PeerLinkRequests)({})),
         Layer.provide(Layer.mock(PeerLinks.PeerLinks)({})),
+        Layer.provide(ServerSettings.layerTest()),
         Layer.provide(
           Layer.mock(ScheduledTaskService.ScheduledTaskService)({
             list: () => Effect.succeed({ tasks }),
