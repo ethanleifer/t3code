@@ -1,10 +1,11 @@
 import { Pressable, ScrollView } from "react-native";
 import { SymbolView } from "../../components/ui/AppSymbol";
 import { ListFilterMenu } from "../layout/workspace/ListFilterMenu";
-import type { EnvironmentId } from "@t3tools/contracts";
-import type {
-  HomeListFilterMenuEnvironment,
-  HomeListFilterMenuProject,
+import type { EnvironmentId, ThreadTagDefinition } from "@t3tools/contracts";
+import {
+  toggleTagName,
+  type HomeListFilterMenuEnvironment,
+  type HomeListFilterMenuProject,
 } from "./home-list-filter-menu";
 
 export function ThreadListFilters(props: {
@@ -12,8 +13,11 @@ export function ThreadListFilters(props: {
   readonly projects: ReadonlyArray<HomeListFilterMenuProject>;
   readonly selectedEnvironmentId: EnvironmentId | null;
   readonly selectedProjectKey: string | null;
+  readonly tags: ReadonlyArray<ThreadTagDefinition>;
+  readonly selectedTagNames: ReadonlyArray<string>;
   readonly onEnvironmentChange: (environmentId: EnvironmentId | null) => void;
   readonly onProjectChange: (projectKey: string | null) => void;
+  readonly onTagNamesChange: (tagNames: ReadonlyArray<string>) => void;
   /** List padding the scroller bleeds through so pills start where row content does. */
   readonly gutter: number;
 }) {
@@ -85,7 +89,41 @@ export function ThreadListFilters(props: {
           }
         }}
       />
-      {props.selectedEnvironmentId !== null || props.selectedProjectKey !== null ? (
+      {props.tags.length > 0 || props.selectedTagNames.length > 0 ? (
+        <ListFilterMenu
+          label={
+            props.selectedTagNames.length > 1
+              ? `Tags ${props.selectedTagNames.length}`
+              : (props.selectedTagNames[0] ?? "Tags")
+          }
+          accessibilityLabel="Filter threads by tag"
+          active={props.selectedTagNames.length > 0}
+          actions={[
+            {
+              id: "all",
+              title: "All tags",
+              state: props.selectedTagNames.length === 0 ? "on" : "off",
+            },
+            ...props.tags.map((tag) => ({
+              id: JSON.stringify(tag.name),
+              title: tag.name,
+              image: "circle.fill",
+              imageColor: tag.color,
+              state: props.selectedTagNames.includes(tag.name) ? ("on" as const) : ("off" as const),
+            })),
+          ]}
+          onSelect={(id) => {
+            if (id === "all") props.onTagNamesChange([]);
+            else {
+              const tag = props.tags.find((candidate) => JSON.stringify(candidate.name) === id);
+              if (tag) props.onTagNamesChange(toggleTagName(props.selectedTagNames, tag.name));
+            }
+          }}
+        />
+      ) : null}
+      {props.selectedEnvironmentId !== null ||
+      props.selectedProjectKey !== null ||
+      props.selectedTagNames.length > 0 ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Reset thread filters"
@@ -93,6 +131,7 @@ export function ThreadListFilters(props: {
           onPress={() => {
             props.onEnvironmentChange(null);
             props.onProjectChange(null);
+            props.onTagNamesChange([]);
           }}
         >
           <SymbolView name="xmark.circle.fill" size={18} tintColorClassName="accent-icon-muted" />

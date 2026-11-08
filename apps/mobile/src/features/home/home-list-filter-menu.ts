@@ -1,4 +1,4 @@
-import type { EnvironmentId } from "@t3tools/contracts";
+import type { EnvironmentId, ThreadTagDefinition } from "@t3tools/contracts";
 
 import type { AppBarMenuItem } from "../../components/ui/AppBar.types";
 
@@ -12,13 +12,22 @@ export interface HomeListFilterMenuProject {
   readonly label: string;
 }
 
+export function toggleTagName(selected: ReadonlyArray<string>, name: string) {
+  return selected.includes(name)
+    ? selected.filter((selectedName) => selectedName !== name)
+    : [...selected, name];
+}
+
 export function buildHomeListFilterMenuItems(props: {
   readonly environments: ReadonlyArray<HomeListFilterMenuEnvironment>;
   readonly projects: ReadonlyArray<HomeListFilterMenuProject>;
   readonly selectedEnvironmentId: EnvironmentId | null;
   readonly selectedProjectKey: string | null;
+  readonly tags: ReadonlyArray<ThreadTagDefinition>;
+  readonly selectedTagNames: ReadonlyArray<string>;
   readonly onEnvironmentChange: (environmentId: EnvironmentId | null) => void;
   readonly onProjectChange: (projectKey: string | null) => void;
+  readonly onTagNamesChange: (tagNames: ReadonlyArray<string>) => void;
 }): AppBarMenuItem[] {
   const items: AppBarMenuItem[] = [
     {
@@ -59,6 +68,30 @@ export function buildHomeListFilterMenuItems(props: {
           title: project.label,
           selected: props.selectedProjectKey === project.key,
           onPress: () => props.onProjectChange(project.key),
+        })),
+      ],
+    });
+  }
+
+  if (props.tags.length > 0 || props.selectedTagNames.length > 0) {
+    items.push({
+      id: "tags",
+      title: "Tags",
+      items: [
+        {
+          id: "tags:all",
+          title: "All tags",
+          subtitle: "Show threads regardless of tags",
+          selected: props.selectedTagNames.length === 0,
+          onPress: () => props.onTagNamesChange([]),
+        },
+        ...props.tags.map((tag) => ({
+          id: `tag:${tag.name}`,
+          title: tag.name,
+          icon: "presence_online",
+          iconColor: tag.color,
+          selected: props.selectedTagNames.includes(tag.name),
+          onPress: () => props.onTagNamesChange(toggleTagName(props.selectedTagNames, tag.name)),
         })),
       ],
     });

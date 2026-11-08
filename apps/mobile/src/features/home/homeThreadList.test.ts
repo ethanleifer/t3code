@@ -5,8 +5,14 @@ import type {
 import { EnvironmentId, ProjectId, ProviderInstanceId, ThreadId } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
-import { buildHomeProjectScopes, findHomeProjectScope } from "./homeThreadList";
-import { makeThreadShellFixture } from "../../test-fixtures";
+import {
+  buildHomeProjectScopes,
+  definedTagNames,
+  findHomeProjectScope,
+  hasAllTags,
+  mergeThreadTagDefinitions,
+} from "./homeThreadList";
+import { makeRawThreadShell, makeThreadShellFixture } from "../../test-fixtures";
 import { buildThreadListV2Items } from "../threads/threadListV2";
 
 function makeProject(
@@ -221,5 +227,50 @@ describe("home project scopes", () => {
     expect(findHomeProjectScope(scopes, "environment-local:project-target")).toBe(targetScope);
     expect(findHomeProjectScope(scopes, "environment-local:missing")).toBeNull();
     expect(findHomeProjectScope(scopes, null)).toBeNull();
+  });
+});
+
+describe("home tag filter", () => {
+  const thread = (tags: ReadonlyArray<string> | undefined) =>
+    makeThread({
+      environmentId: EnvironmentId.make("env-1"),
+      id: ThreadId.make("thread-1"),
+      projectId: ProjectId.make("project-1"),
+      title: "Thread",
+      source: makeRawThreadShell(tags === undefined ? {} : { tags }),
+    });
+
+  it("matches only threads carrying every selected tag", () => {
+    expect(hasAllTags(thread(["bug", "urgent", "section:inbox"]), ["bug", "urgent"])).toBe(true);
+    expect(hasAllTags(thread(["Bug", "section:inbox"]), ["bug"])).toBe(false);
+    expect(hasAllTags(thread(["section:inbox"]), ["section:inbox"])).toBe(true);
+    expect(hasAllTags(thread(["bug"]), ["bug", "urgent"])).toBe(false);
+    expect(hasAllTags(thread(undefined), ["bug"])).toBe(false);
+    expect(hasAllTags(thread(undefined), [])).toBe(true);
+  });
+
+  it("merges definitions by name and drops selected tags no longer defined", () => {
+    const definitions = mergeThreadTagDefinitions([
+      [
+        { name: "urgent", color: "#aB12CD" },
+        { name: "bug", color: "#Ff8800" },
+      ],
+      [
+        { name: "bug", color: "#0000ff" },
+        { name: "Bug", color: "#123456" },
+        { name: "docs", color: "#008000" },
+      ],
+    ]);
+    expect(definitions).toEqual([
+      { name: "Bug", color: "#123456" },
+      { name: "bug", color: "#Ff8800" },
+      { name: "docs", color: "#008000" },
+      { name: "urgent", color: "#aB12CD" },
+    ]);
+    expect(definedTagNames(["urgent"], undefined)).toEqual(["urgent"]);
+    expect(definedTagNames(["urgent"], [])).toEqual([]);
+    expect(definedTagNames(["urgent", "deleted", "section:inbox"], definitions)).toEqual([
+      "urgent",
+    ]);
   });
 });

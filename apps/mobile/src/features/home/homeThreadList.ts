@@ -12,6 +12,7 @@ import type {
   ScopedProjectRef,
   SidebarProjectGroupingMode,
   SidebarProjectSortOrder,
+  ThreadTagDefinition,
 } from "@t3tools/contracts";
 import * as Arr from "effect/Array";
 import * as Order from "effect/Order";
@@ -146,4 +147,33 @@ export function sortHomeProjectScopes(input: {
       }),
     ),
   );
+}
+
+// The first environment owns the color when names overlap.
+export function mergeThreadTagDefinitions(
+  lists: ReadonlyArray<ReadonlyArray<ThreadTagDefinition>>,
+): ReadonlyArray<ThreadTagDefinition> {
+  const byName = new Map<string, ThreadTagDefinition>();
+  for (const definition of lists.flat()) {
+    if (!byName.has(definition.name)) byName.set(definition.name, definition);
+  }
+  return Arr.sort(
+    byName.values(),
+    Order.mapInput(Order.String, (definition: ThreadTagDefinition) => definition.name),
+  );
+}
+
+export function definedTagNames(
+  selected: ReadonlyArray<string>,
+  definitions: ReadonlyArray<ThreadTagDefinition> | undefined,
+): ReadonlyArray<string> {
+  if (definitions === undefined) return selected;
+  return selected.filter((name) => definitions.some((definition) => definition.name === name));
+}
+
+export function hasAllTags(
+  thread: Pick<EnvironmentThreadShell, "source">,
+  tagNames: ReadonlyArray<string>,
+): boolean {
+  return tagNames.every((name) => thread.source.tags?.includes(name) === true);
 }

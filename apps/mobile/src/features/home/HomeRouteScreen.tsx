@@ -117,10 +117,13 @@ export function HomeRouteScreen() {
   );
   const {
     options: listOptions,
+    tagDefinitions,
     setSelectedEnvironmentId,
     setSelectedProjectKey,
+    setSelectedTagNames,
   } = useHomeListOptions(availableEnvironmentIds);
   const selectedEnvironmentId = listOptions.selectedEnvironmentId;
+  const selectedTagNames = listOptions.selectedTagNames;
   // A legacy per-environment scratch key resolves here on every render; the stored
   // value is only rewritten when the user picks a filter.
   const resolvedProjectKey = resolveScratchProjectScopeKey(
@@ -174,14 +177,20 @@ export function HomeRouteScreen() {
             accessibilityLabel: "Search threads",
           }}
           filter={{
-            customized: selectedEnvironmentId !== null || selectedProjectKey !== null,
+            customized:
+              selectedEnvironmentId !== null ||
+              selectedProjectKey !== null ||
+              selectedTagNames.length > 0,
             items: buildHomeListFilterMenuItems({
               environments,
               projects: projectFilterOptions,
               selectedEnvironmentId,
               selectedProjectKey,
+              tags: tagDefinitions,
+              selectedTagNames,
               onEnvironmentChange: setSelectedEnvironmentId,
               onProjectChange: setSelectedProjectKey,
+              onTagNamesChange: setSelectedTagNames,
             }),
           }}
         />
@@ -204,6 +213,7 @@ export function HomeRouteScreen() {
           onRegenerateThreadTitle={regenerateThreadTitle}
           onEnvironmentChange={setSelectedEnvironmentId}
           onProjectChange={setSelectedProjectKey}
+          onTagNamesChange={setSelectedTagNames}
           onOpenSettings={() => selectTab("settings")}
           onSearchQueryChange={setSearchQuery}
           onSelectThread={handleSelectThread}
@@ -229,6 +239,8 @@ export function HomeRouteScreen() {
           searchQuery={searchQuery}
           selectedEnvironmentId={selectedEnvironmentId}
           selectedProjectKey={selectedProjectKey}
+          tagDefinitions={tagDefinitions}
+          selectedTagNames={selectedTagNames}
           threads={threads}
         />
         <ThreadUndoNotice visible={visible} />

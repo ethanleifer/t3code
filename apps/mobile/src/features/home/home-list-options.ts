@@ -2,15 +2,25 @@ import type { EnvironmentId, SidebarProjectGroupingMode } from "@t3tools/contrac
 import { DEFAULT_SIDEBAR_PROJECT_SORT_ORDER } from "@t3tools/contracts";
 import { RegistryContext, useAtomSet, useAtomValue } from "@effect/atom-react";
 import { Atom } from "effect/reactivity";
-import { createContext, createElement, useContext, useState, type PropsWithChildren } from "react";
+import {
+  createContext,
+  createElement,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type PropsWithChildren,
+} from "react";
 
 import type { ThreadListFilters } from "../../persistence/mobile-preferences";
 import { updateMobilePreferencesAtom } from "../../state/preferences";
-import type { HomeProjectSortOrder } from "./homeThreadList";
+import { definedTagNames, type HomeProjectSortOrder } from "./homeThreadList";
+import { useThreadTagDefinitions } from "./thread-tag-filter";
 
 export interface HomeListOptions {
   readonly selectedEnvironmentId: EnvironmentId | null;
   readonly selectedProjectKey: string | null;
+  readonly selectedTagNames: ReadonlyArray<string>;
   readonly projectSortOrder: HomeProjectSortOrder;
 }
 
@@ -22,6 +32,7 @@ function defaultHomeListOptions(filters?: ThreadListFilters): HomeListOptions {
   return {
     selectedEnvironmentId: filters?.environmentId ?? null,
     selectedProjectKey: filters?.projectKey ?? null,
+    selectedTagNames: filters?.tagNames ?? [],
     projectSortOrder:
       DEFAULT_SIDEBAR_PROJECT_SORT_ORDER === "manual"
         ? "updated_at"
@@ -57,12 +68,14 @@ export function HomeListOptionsProvider({
     registry.set(optionsAtom, next);
     if (
       next.selectedEnvironmentId !== current.selectedEnvironmentId ||
-      next.selectedProjectKey !== current.selectedProjectKey
+      next.selectedProjectKey !== current.selectedProjectKey ||
+      next.selectedTagNames !== current.selectedTagNames
     ) {
       savePreferences({
         threadListFilters: {
           environmentId: next.selectedEnvironmentId,
           projectKey: next.selectedProjectKey,
+          tagNames: next.selectedTagNames,
         },
       });
     }
@@ -87,8 +100,22 @@ export function useHomeListOptions(availableEnvironmentIds: ReadonlySet<Environm
     selectedEnvironmentId === options.selectedEnvironmentId
       ? options
       : { ...options, selectedEnvironmentId };
+  const { definitions: tagDefinitions, loaded: tagDefinitionsLoaded } =
+    useThreadTagDefinitions(selectedEnvironmentId);
+  const selectedTagNames = useMemo(
+    () =>
+      definedTagNames(options.selectedTagNames, tagDefinitionsLoaded ? tagDefinitions : undefined),
+    [options.selectedTagNames, tagDefinitions, tagDefinitionsLoaded],
+  );
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Persist deletions only after scoped server settings have loaded.
+  useEffect(() => {
+    if (selectedTagNames.length !== options.selectedTagNames.length) {
+      updateOptions({ selectedTagNames });
+    }
+  }, [selectedTagNames, options.selectedTagNames, updateOptions]);
   const resolvedOptions: ResolvedHomeListOptions = {
     ...availableOptions,
+    selectedTagNames,
     projectGroupingMode: shared?.projectGroupingMode ?? "repository",
   };
 
@@ -98,13 +125,18 @@ export function useHomeListOptions(availableEnvironmentIds: ReadonlySet<Environm
   const setSelectedProjectKey = (value: string | null) => {
     updateOptions({ selectedProjectKey: value });
   };
+  const setSelectedTagNames = (value: ReadonlyArray<string>) => {
+    updateOptions({ selectedTagNames: value });
+  };
   const setProjectSortOrder = (value: HomeProjectSortOrder) => {
     updateOptions({ projectSortOrder: value });
   };
   return {
     options: resolvedOptions,
+    tagDefinitions,
     setSelectedEnvironmentId,
     setSelectedProjectKey,
+    setSelectedTagNames,
     setProjectSortOrder,
   } as const;
 }
