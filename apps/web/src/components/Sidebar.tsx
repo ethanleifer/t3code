@@ -1,9 +1,5 @@
 import { attachSidebarTree } from "../lib/sidebarTree";
-import {
-  type EnvironmentId,
-  type ScopedProjectRef,
-  type ThreadTagDefinition,
-} from "@t3tools/contracts";
+import { EnvironmentId, type ScopedProjectRef, type ThreadTagDefinition } from "@t3tools/contracts";
 import type { EnvironmentServerConfig } from "@t3tools/client-runtime/connection";
 import { ThreadContextDragGhost } from "./chat/ThreadContextDragGhost";
 import {
@@ -190,6 +186,7 @@ import {
 import {
   applySidebarThreadDrop,
   filterSidebarThreadsByTags,
+  scopeSidebarProjectsToMachine,
   mergeThreadTagDefinitions,
   groupSidebarThreadsByTag,
   filterSidebarV2VisibleThreads,
@@ -267,6 +264,7 @@ import {
 import { SidebarContent, SidebarGroup, useSidebar } from "./ui/sidebar";
 import { SidebarChromeFooter, SidebarChromeHeader } from "./sidebar/SidebarChrome";
 import { SidebarHeaderIconButton, SidebarThreadHeader } from "./sidebar/SidebarThreadHeader";
+import { SidebarMachineFilter } from "./sidebar/SidebarMachineFilter";
 import {
   SidebarActiveTagFilter,
   SidebarTagFilterMenu,
@@ -352,6 +350,7 @@ const SNOOZED_SHELF_EXPANDED_KEY = "t3code:sidebar:snoozed-expanded";
 const WORKING_SHELF_EXPANDED_KEY = "t3code:sidebar:working-expanded";
 const SIDEBAR_GROUPING_SCHEMA = Schema.Literals(["status", "tag"]);
 const COLLAPSED_TAG_GROUPS_SCHEMA = Schema.Array(Schema.String);
+const MACHINE_FILTER_SCHEMA = Schema.NullOr(EnvironmentId);
 const EMPTY_TAG_GROUPS: readonly string[] = [];
 
 const inboxReturns = createInboxReturnTracker();
@@ -1069,6 +1068,15 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     routeTarget?.kind === "draft" ? store.getDraftSession(routeTarget.draftId) : null,
   );
   const environmentMachineById = useEnvironmentMachines();
+  const [persistedMachineFilter, setMachineFilter] = useLocalStorage(
+    "t3code:sidebar-machine-filter:v1",
+    null,
+    MACHINE_FILTER_SCHEMA,
+  );
+  const machineFilter =
+    persistedMachineFilter !== null && environmentLabelById.has(persistedMachineFilter)
+      ? persistedMachineFilter
+      : null;
   const projectGroupsRef = useRef(projectGroups);
   const persistedProjectScopeKeys = useUiStateStore((store) => store.sidebarProjectScopeKeys);
   const setPersistedProjectScopeKeys = useUiStateStore((store) => store.setSidebarProjectScopeKeys);
@@ -1196,7 +1204,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const chosenProjectGroups = scopeGroups.filter((project) =>
     chosenProjectScopeKeys.includes(project.projectKey),
   );
-  const chosenScopeProjectKeys =
+  const chosenScopeProjectKeys = scopeSidebarProjectsToMachine(
+    projects,
     chosenProjectGroups.length === 0
       ? null
       : new Set(
@@ -1205,7 +1214,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               (projectRef) => `${projectRef.environmentId}:${projectRef.projectId}`,
             ),
           ),
-        );
+        ),
+    machineFilter,
+  );
   const threads = useQuietThreadShells();
   const routeRowThreadKey =
     routeThreadRef === null
@@ -1251,7 +1262,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     if (!revealWidensScope) return;
     clearSelection();
     setPersistedProjectScopeKeys([]);
-  }, [clearSelection, revealWidensScope, setPersistedProjectScopeKeys]);
+    setMachineFilter(null);
+  }, [clearSelection, revealWidensScope, setPersistedProjectScopeKeys, setMachineFilter]);
   const revealActiveRow = useActiveRowReveal(routeReveal, routeRowThreadKey);
   const showProjectEnvironments = projectGroupsSpanEnvironments(projectGroups);
   const scratchMachineLabelFor = (
@@ -1287,10 +1299,13 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const scopedProjectGroups = revealWidensScope ? [] : chosenProjectGroups;
   const scopedProjectRefs = scopedProjectGroups.flatMap((project) => project.memberProjectRefs);
   const scopedProjectKeys = revealWidensScope ? null : chosenScopeProjectKeys;
+  const scopedMachineFilter = revealWidensScope ? null : machineFilter;
   // Tag terms filter loaded rows; the server searches messages for the rest.
   const threadSearchTextQuery = parseThreadTagQuery(threadSearchQuery).text;
   const threadSearch = useThreadSearch(
-    connectedEnvironmentIds,
+    connectedEnvironmentIds.filter(
+      (id) => scopedMachineFilter === null || id === scopedMachineFilter,
+    ),
     threadSearchTextQuery,
     scopedProjectGroups.length === 0
       ? {}
@@ -1436,7 +1451,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     pinnedKeysById,
     activeKeysById,
   } = useSidebarThreads({
-    projectScopeKey,
+    projectScopeKey: `${projectScopeKey ?? ""}:${scopedMachineFilter ?? ""}`,
     scopedProjectKeys,
     tagFilter,
     grouping: sidebarGrouping,
@@ -1452,8 +1467,16 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       sidebarGrouping === "status" && boringSidebarEnabled
         ? scopedProjectGroups.length === 0
           ? // An archived project keeps a folder for its active threads, below the rest.
-            [...scopeGroups, ...projectGroups.filter((project) => project.archived)]
-          : scopedProjectGroups
+            [...scopeGroups, ...projectGroups.filter((project) => project.archived)].filter(
+              (group) =>
+                scopedMachineFilter === null ||
+                group.memberProjectRefs.some((ref) => ref.environmentId === scopedMachineFilter),
+            )
+          : scopedProjectGroups.filter(
+              (group) =>
+                scopedMachineFilter === null ||
+                group.memberProjectRefs.some((ref) => ref.environmentId === scopedMachineFilter),
+            )
         : null,
     keepEmptyFolders: (group) =>
       scopedProjectGroups.length > 0 || (group.pinned && !group.archived),
@@ -3370,6 +3393,17 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                     </ComboboxList>
                   </ComboboxPopup>
                 </Combobox>
+              }
+              machineFilter={
+                <SidebarMachineFilter
+                  machines={environmentLabelById}
+                  selected={scopedMachineFilter}
+                  onChange={(id) => {
+                    clearSelection();
+                    setMachineFilter(id);
+                    scrollSidebarToTop(sidebarContentRef.current);
+                  }}
+                />
               }
               tagFilter={
                 <SidebarTagFilterMenu

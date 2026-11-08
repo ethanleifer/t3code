@@ -594,6 +594,23 @@ export function resolveSidebarRowThreadId(
   return thread?.id ?? threadId;
 }
 
+export function scopeSidebarProjectsToMachine(
+  projects: ReadonlyArray<{ environmentId: string; id: string }>,
+  projectKeys: ReadonlySet<string> | null,
+  environmentId: string | null,
+): ReadonlySet<string> | null {
+  if (environmentId === null) return projectKeys;
+  return new Set(
+    projects.flatMap((project) => {
+      const key = `${project.environmentId}:${project.id}`;
+      return project.environmentId === environmentId &&
+        (projectKeys === null || projectKeys.has(key))
+        ? [key]
+        : [];
+    }),
+  );
+}
+
 /**
  * `delegatedUnderParent` holds the tasks linked environments run for a thread
  * the sidebar lists, by thread key; they show under that thread, as subagents do.

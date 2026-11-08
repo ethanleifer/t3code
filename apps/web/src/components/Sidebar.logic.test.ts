@@ -20,6 +20,7 @@ import {
   searchSidebarThreads,
   resolveSidebarTagFilter,
   filterSidebarThreadsByTags,
+  scopeSidebarProjectsToMachine,
   mergeThreadTagDefinitions,
   groupSidebarThreadsByTag,
   shouldRecedeSidebarThread,
@@ -371,6 +372,29 @@ describe("searchSidebarThreads", () => {
       titleMatches: [tagged[0]],
       contentMatches: [tagged[1]],
     });
+  });
+});
+
+describe("sidebar machine filter", () => {
+  it("intersects machine and project scopes without widening empty results", () => {
+    const projects = [
+      { environmentId: "local", id: "repo" },
+      { environmentId: "remote", id: "repo" },
+      { environmentId: "remote", id: "other" },
+    ];
+    const selected = new Set(["local:repo", "remote:repo"]);
+    expect(scopeSidebarProjectsToMachine(projects, null, null)).toBeNull();
+    expect(scopeSidebarProjectsToMachine(projects, selected, null)).toBe(selected);
+    expect(scopeSidebarProjectsToMachine(projects, null, "remote")).toEqual(
+      new Set(["remote:repo", "remote:other"]),
+    );
+    expect(scopeSidebarProjectsToMachine(projects, selected, "remote")).toEqual(
+      new Set(["remote:repo"]),
+    );
+    expect(scopeSidebarProjectsToMachine(projects, new Set(["local:repo"]), "remote")).toEqual(
+      new Set(),
+    );
+    expect(scopeSidebarProjectsToMachine(projects, null, "missing")).toEqual(new Set());
   });
 });
 
