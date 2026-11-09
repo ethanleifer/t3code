@@ -6,6 +6,8 @@ import { useThreadShells } from "../../state/entities";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Input } from "../ui/input";
+import { AreaArtifact } from "./AreaArtifact";
+import { createAreaArtifact } from "./areaArtifactTemplate";
 import { AreaLead } from "./AreaLead";
 import { AreaWorkstreams } from "./AreaWorkstreams";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
@@ -216,14 +218,39 @@ export function AreasPage() {
                 onUpdate={updateArea}
                 onOpen={openWorkstream}
                 composerRef={composerRef}
+                wide={wide}
+                threads={threads}
+                onOpenOverview={() => {
+                  setSelectedId(null);
+                  setPanelOpen(false);
+                }}
+                onAttach={() => {
+                  setSearch("");
+                  setAttaching(true);
+                }}
+                onManage={() => {
+                  setSelectedId(null);
+                  setPanelOpen(true);
+                }}
               />
             </div>
             {wide ? (
               <aside
-                className="flex w-72 shrink-0 flex-col border-l border-border xl:w-80"
-                aria-label="Contextual workstreams"
+                className="flex w-[45%] min-w-80 shrink-0 flex-col border-l border-border"
+                aria-label="Area context pane"
               >
-                {workstreams}
+                {panelOpen || selectedId ? (
+                  workstreams
+                ) : (
+                  <AreaArtifact
+                    key={area.id}
+                    variant="pane"
+                    html={area.artifactHtml ?? createAreaArtifact(area)}
+                    onSave={(artifactHtml) =>
+                      updateArea((current) => ({ ...current, artifactHtml }))
+                    }
+                  />
+                )}
               </aside>
             ) : null}
           </div>

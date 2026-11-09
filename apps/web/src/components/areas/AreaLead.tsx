@@ -1,12 +1,18 @@
 import { useState, type RefObject } from "react";
-import { ArrowUpRightIcon, MessageSquareIcon } from "lucide-react";
+import { ArrowUpRightIcon, FileCodeIcon, MessageSquareIcon } from "lucide-react";
 import { randomUUID } from "../../lib/utils";
 import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
 import { ComposerBanner } from "../chat/ComposerBanner";
 import { AreaArtifact } from "./AreaArtifact";
 import { createAreaArtifact } from "./areaArtifactTemplate";
-import type { PreviewArea, AreaWorkstream } from "./areasPreview";
+import type { SidebarThreadSummary } from "../../types";
+import {
+  workstreamState,
+  WORKSTREAM_LABELS,
+  type PreviewArea,
+  type AreaWorkstream,
+} from "./areasPreview";
 
 export function AreaLead({
   area,
@@ -14,12 +20,22 @@ export function AreaLead({
   onUpdate,
   onOpen,
   composerRef,
+  wide,
+  threads,
+  onOpenOverview,
+  onAttach,
+  onManage,
 }: {
   area: PreviewArea;
   needsYou: readonly AreaWorkstream[];
   onUpdate: (update: (current: PreviewArea) => PreviewArea) => void;
   onOpen: (id: string) => void;
   composerRef: RefObject<HTMLTextAreaElement | null>;
+  wide: boolean;
+  threads: readonly SidebarThreadSummary[];
+  onOpenOverview: () => void;
+  onAttach: () => void;
+  onManage: () => void;
 }) {
   const [note, setNote] = useState("");
   const addSummary = () => {
@@ -35,10 +51,24 @@ export function AreaLead({
     <section className="flex h-full min-h-0 min-w-0 flex-col" aria-label="Area lead conversation">
       <div className="shrink-0 border-b border-border/60 px-4 py-2 sm:px-6">
         <div className="mx-auto w-full max-w-(--chat-content-max-width)">
-          <AreaArtifact
-            html={area.artifactHtml ?? createAreaArtifact(area)}
-            onSave={(artifactHtml) => onUpdate((current) => ({ ...current, artifactHtml }))}
-          />
+          {wide ? (
+            <button
+              type="button"
+              aria-label="Show overview artifact"
+              onClick={onOpenOverview}
+              className="flex w-full cursor-pointer items-center gap-2 rounded-lg border border-border/60 px-3 py-2 text-left text-xs outline-none hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+            >
+              <FileCodeIcon className="size-4 text-icon-muted" />
+              <span className="flex-1">Overview</span>
+              <span className="text-2xs text-muted-foreground">Open alongside</span>
+              <ArrowUpRightIcon className="size-3.5 text-icon-muted" />
+            </button>
+          ) : (
+            <AreaArtifact
+              html={area.artifactHtml ?? createAreaArtifact(area)}
+              onSave={(artifactHtml) => onUpdate((current) => ({ ...current, artifactHtml }))}
+            />
+          )}
         </div>
       </div>
       <div
@@ -76,27 +106,59 @@ export function AreaLead({
               </article>
             ))}
           </div>
-          {needsYou.length > 0 ? (
-            <section aria-label="Decisions to review" className="space-y-2">
-              <h2 className="text-xs font-medium text-muted-foreground">Needs your decision</h2>
-              {needsYou.map((stream) => (
+          <section aria-label="Workstream cards" className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-xs font-medium text-muted-foreground">
+                Workstreams · {area.workstreams.length}
+              </h2>
+              <div className="flex gap-1">
+                <Button size="sm" variant="ghost-muted" onClick={onAttach}>
+                  Attach thread
+                </Button>
+                <Button size="sm" variant="ghost-muted" onClick={onManage}>
+                  Manage
+                </Button>
+              </div>
+            </div>
+            {area.workstreams.map((stream) => {
+              const source = stream.source;
+              const thread =
+                source.kind === "thread"
+                  ? threads.find(
+                      (item) =>
+                        item.environmentId === source.environmentId && item.id === source.threadId,
+                    )
+                  : undefined;
+              const state = workstreamState(stream, thread);
+              return (
                 <button
                   type="button"
                   key={stream.id}
+                  aria-label={`Inspect workstream: ${stream.title}`}
                   onClick={() => onOpen(stream.id)}
-                  className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5 text-left outline-none hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                  className="flex w-full cursor-pointer items-center gap-3 rounded-lg border border-border px-3 py-2.5 text-left outline-none hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                 >
-                  <span className="min-w-0">
+                  <span className="min-w-0 flex-1">
+                    <span className="mb-1 flex items-center gap-1.5 text-2xs text-muted-foreground">
+                      <span
+                        className="size-1.5 rounded-full bg-muted-foreground data-[state=needs-you]:bg-warning data-[state=working]:bg-info data-[state=done]:bg-success"
+                        data-state={state}
+                      />
+                      {source.kind === "thread" && !thread
+                        ? "Not loaded"
+                        : WORKSTREAM_LABELS[state]}{" "}
+                      · {source.kind === "sample" ? "Sample" : "Linked thread"}
+                    </span>
                     <span className="block text-sm font-medium">{stream.title}</span>
-                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                    <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
                       {stream.nextAction}
                     </span>
                   </span>
                   <ArrowUpRightIcon className="size-4 shrink-0 text-icon-muted" />
                 </button>
-              ))}
-            </section>
-          ) : null}
+              );
+            })}
+          </section>
         </div>
       </div>
       <div className="shrink-0 px-4 pt-2 pb-4 sm:px-6">
