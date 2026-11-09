@@ -1,28 +1,19 @@
 import { useState } from "react";
 import { CodeIcon, ExpandIcon, EyeIcon } from "lucide-react";
+import { AreaArtifactFrame } from "./AreaArtifactFrame";
 import { Button } from "../ui/button";
 import { Dialog, DialogPopup, DialogHeader, DialogTitle, DialogDescription } from "../ui/dialog";
-import styles from "./areas.module.css";
 
 export function AreaArtifact({ html, onSave }: { html: string; onSave: (html: string) => void }) {
   const [editing, setEditing] = useState(false);
   const [source, setSource] = useState(html);
   const [expanded, setExpanded] = useState(false);
-  const frame = (large: boolean) => (
-    <iframe
-      title={large ? "Expanded Area artifact" : "Area overview artifact"}
-      className={large ? styles["artifact-expanded-frame"] : styles["artifact-frame"]}
-      srcDoc={html}
-      sandbox="allow-scripts"
-      referrerPolicy="no-referrer"
-    />
-  );
   return (
-    <section className={styles["area-artifact"]} aria-label="Overview artifact">
-      <div className={styles["area-section-heading"]}>
+    <section className="mb-5 min-w-0" aria-label="Overview artifact">
+      <div className="mb-3 flex items-center justify-between gap-3 [&_h2]:flex [&_h2]:items-center [&_h2]:gap-2 [&_h2]:text-xs [&_h2]:font-medium">
         <div>
-          <h2>Overview canvas</h2>
-          <p className={styles["artifact-caption"]}>Anything you can make in HTML.</p>
+          <h2>Overview</h2>
+          <p className="mt-1 text-2xs text-muted-foreground">HTML artifact</p>
         </div>
         <div className="flex gap-1">
           <Button
@@ -54,17 +45,20 @@ export function AreaArtifact({ html, onSave }: { html: string; onSave: (html: st
             setEditing(false);
           }}
         >
-          <label className={styles["artifact-source-label"]} htmlFor="area-artifact-source">
+          <label
+            className="mb-2 block text-xs text-muted-foreground"
+            htmlFor="area-artifact-source"
+          >
             HTML, CSS, and JavaScript. Paste a complete document or a fragment.
           </label>
           <textarea
             id="area-artifact-source"
-            className={styles["artifact-source"]}
+            className="min-h-96 w-full resize-y rounded-md border border-input bg-code p-3 font-mono text-xs leading-relaxed text-foreground outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
             spellCheck={false}
             value={source}
             onChange={(event) => setSource(event.target.value)}
           />
-          <div className={styles["artifact-editor-footer"]}>
+          <div className="mt-2 flex items-center justify-between gap-3 [&_span]:text-2xs [&_span]:text-muted-foreground">
             <span>Replace the whole canvas. There is no required structure.</span>
             <Button size="sm" type="submit">
               Save & render
@@ -73,8 +67,10 @@ export function AreaArtifact({ html, onSave }: { html: string; onSave: (html: st
         </form>
       ) : (
         <>
-          <div className={styles["artifact-resizer"]}>{frame(false)}</div>
-          <p className={styles["artifact-caption"]}>
+          <div className="h-[520px] min-h-48 resize-y overflow-hidden rounded-lg border border-border bg-background">
+            <AreaArtifactFrame html={html} />
+          </div>
+          <p className="mt-1 text-2xs text-muted-foreground">
             Drag the lower corner to resize. Expand for more room.
           </p>
         </>
@@ -82,10 +78,14 @@ export function AreaArtifact({ html, onSave }: { html: string; onSave: (html: st
       <Dialog open={expanded} onOpenChange={setExpanded}>
         <DialogPopup className="w-[94vw] max-w-[1400px]">
           <DialogHeader>
-            <DialogTitle>Overview canvas</DialogTitle>
-            <DialogDescription>Your Area’s freeform HTML artifact.</DialogDescription>
+            <DialogTitle>Overview</DialogTitle>
+            <DialogDescription>
+              HTML, CSS, and JavaScript. Make this space your own.
+            </DialogDescription>
           </DialogHeader>
-          <div className="px-4 pb-4">{frame(true)}</div>
+          <div className="px-4 pb-4">
+            <AreaArtifactFrame html={html} expanded />
+          </div>
         </DialogPopup>
       </Dialog>
     </section>

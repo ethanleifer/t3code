@@ -7,7 +7,16 @@ import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Input } from "../ui/input";
 import { AreaLead } from "./AreaLead";
-import { SidebarInset, SidebarTrigger } from "../ui/sidebar";
+import { WorkspacePageHeader } from "../WorkspacePageHeader";
+import {
+  WorkspaceBreadcrumb,
+  WorkspaceBreadcrumbItem,
+  WorkspaceBreadcrumbSeparator,
+} from "../WorkspaceBreadcrumb";
+import { isElectron } from "../../env";
+import { Select, SelectTrigger, SelectValue, SelectPopup, SelectItem } from "../ui/select";
+import { ToggleGroup, Toggle } from "../ui/toggle-group";
+import { SidebarInset } from "../ui/sidebar";
 import { Dialog, DialogPopup, DialogHeader, DialogTitle, DialogDescription } from "../ui/dialog";
 import { AreaArtifact } from "./AreaArtifact";
 import { createAreaArtifact } from "./areaArtifactTemplate";
@@ -23,8 +32,7 @@ import {
   type PreviewArea,
   type AreaWorkstream,
 } from "./areasPreview";
-import styles from "./areas.module.css";
-import { randomUUID } from "../../lib/utils";
+import { cn, randomUUID } from "../../lib/utils";
 
 const VIEWS = ["Overview", "Conversation", "Board"] as const;
 type View = (typeof VIEWS)[number];
@@ -99,12 +107,15 @@ export function AreasPage() {
         <button
           type="button"
           key={stream.id}
-          className={styles["area-stream"]}
+          className="group flex w-full cursor-pointer flex-col gap-1.5 rounded-md border border-border/60 bg-background px-3 py-2.5 text-left outline-none hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring data-[selected=true]:border-ring/50 data-[selected=true]:bg-accent/50"
           data-selected={selectedId === stream.id}
           onClick={() => setSelectedId(stream.id)}
         >
-          <span className={styles["area-stream-top"]}>
-            <span className={styles["area-dot"]} data-state={state} />
+          <span className="flex flex-wrap items-center gap-1.5 text-3xs text-muted-foreground">
+            <span
+              className="inline-block size-1.5 shrink-0 rounded-full bg-muted-foreground data-[state=needs-you]:bg-warning data-[state=working]:bg-info data-[state=done]:bg-success"
+              data-state={state}
+            />
             {stream.source.kind === "thread" && !findThread(stream)
               ? "Not loaded"
               : WORKSTREAM_LABELS[state]}
@@ -112,11 +123,11 @@ export function AreasPage() {
               {stream.source.kind === "sample" ? "Sample" : "Linked thread"}
             </span>
           </span>
-          <strong>{stream.title}</strong>
-          <span className={styles["area-stream-summary"]}>
+          <strong className="text-xs font-medium leading-relaxed">{stream.title}</strong>
+          <span className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">
             {stream.summary || "Add context in the workstream details."}
           </span>
-          <span className={styles["area-stream-next"]}>
+          <span className="mt-1 flex items-start gap-2 text-xs leading-relaxed text-muted-foreground [&_svg]:mt-0.5 [&_svg]:shrink-0">
             {stream.nextAction}
             <ArrowUpRightIcon size={14} />
           </span>
@@ -124,8 +135,11 @@ export function AreasPage() {
       );
     });
   const detail = selected ? (
-    <section className={styles["area-detail"]} aria-label="Workstream details">
-      <div className={styles["area-section-heading"]}>
+    <section
+      className="min-w-0 [&_p]:text-xs [&_p]:leading-relaxed"
+      aria-label="Workstream details"
+    >
+      <div className="mb-3 flex items-center justify-between gap-3 [&_h2]:flex [&_h2]:items-center [&_h2]:gap-2 [&_h2]:text-xs [&_h2]:font-medium">
         <h2>{selected.title}</h2>
         <Button
           size="icon-sm"
@@ -138,26 +152,25 @@ export function AreasPage() {
       </div>
       <p>{selected.summary}</p>
       {selected.source.kind === "thread" && !findThread(selected) ? (
-        <p className={styles["area-muted"]}>
+        <p className="text-xs text-muted-foreground">
           This thread is not loaded. Open the original to reconnect with its context.
         </p>
       ) : null}
-      <p className={`${styles["area-eyebrow"]} mt-5`}>Next step</p>
+      <p className="mt-5 mb-2 text-xs font-medium text-muted-foreground">Next step</p>
       <p>{selected.nextAction}</p>
-      <ul className={styles["area-updates"]}>
+      <ul className="flex list-inside list-disc flex-col gap-2 py-4 text-xs text-muted-foreground">
         {selected.updates.map((update) => (
           <li key={update}>{update}</li>
         ))}
       </ul>
-      <div className={styles["area-detail-actions"]}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
         {selected.source.kind === "sample" ? (
-          <label className={styles["area-state-picker"]}>
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
             Sample status
-            <select
-              aria-label="Workstream status"
+            <Select
               value={selected.source.state}
-              onChange={(event) => {
-                const state = WORKSTREAM_STATES.find((item) => item === event.target.value);
+              onValueChange={(value) => {
+                const state = WORKSTREAM_STATES.find((item) => item === value);
                 if (state)
                   updateArea((current) => ({
                     ...current,
@@ -169,16 +182,21 @@ export function AreasPage() {
                   }));
               }}
             >
-              {WORKSTREAM_STATES.map((state) => (
-                <option value={state} key={state}>
-                  {WORKSTREAM_LABELS[state]}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger size="compact" aria-label="Workstream status">
+                <SelectValue>{WORKSTREAM_LABELS[selected.source.state]}</SelectValue>
+              </SelectTrigger>
+              <SelectPopup>
+                {WORKSTREAM_STATES.map((state) => (
+                  <SelectItem value={state} key={state}>
+                    {WORKSTREAM_LABELS[state]}
+                  </SelectItem>
+                ))}
+              </SelectPopup>
+            </Select>
           </label>
         ) : (
           <Link
-            className={styles["area-thread-link"]}
+            className="flex items-center gap-1.5 text-xs text-primary underline underline-offset-4"
             to="/$environmentId/$threadId"
             params={{
               environmentId: selected.source.environmentId,
@@ -215,72 +233,101 @@ export function AreasPage() {
   ) : null;
   return (
     <SidebarInset className="h-dvh min-h-0 overflow-hidden">
-      <div className={styles["areas-page"]}>
-        <header className={styles["areas-header"]}>
-          <SidebarTrigger />
-          <BoxesIcon size={18} />
-          <span>Areas</span>
-          <Badge variant="outline" size="sm">
-            Preview
-          </Badge>
-          <div className="ml-auto">
-            <Button size="sm" variant="outline" onClick={() => setEditor("area")}>
+      <div className="flex h-full min-h-0 flex-col bg-background text-foreground">
+        <WorkspacePageHeader electron={isElectron} className="border-b border-border bg-background">
+          <div className="[-webkit-app-region:no-drag] flex min-w-0 flex-1 items-center gap-2">
+            <WorkspaceBreadcrumb ariaLabel="Areas breadcrumb">
+              <WorkspaceBreadcrumbItem>
+                <BoxesIcon className="size-4" />
+                <span className="ml-2">Areas</span>
+              </WorkspaceBreadcrumbItem>
+              {area ? (
+                <>
+                  <WorkspaceBreadcrumbSeparator />
+                  <WorkspaceBreadcrumbItem current>
+                    <Select
+                      value={area.id}
+                      onValueChange={(id) => {
+                        if (id !== null) {
+                          setStore((current) => ({ ...current, selectedAreaId: id }));
+                          setSelectedId(null);
+                        }
+                      }}
+                    >
+                      <SelectTrigger variant="ghost" size="compact" aria-label="Choose Area">
+                        <SelectValue>{area.name}</SelectValue>
+                      </SelectTrigger>
+                      <SelectPopup>
+                        {store.areas.map((item) => (
+                          <SelectItem value={item.id} key={item.id}>
+                            {item.name}
+                          </SelectItem>
+                        ))}
+                      </SelectPopup>
+                    </Select>
+                  </WorkspaceBreadcrumbItem>
+                </>
+              ) : null}
+            </WorkspaceBreadcrumb>
+          </div>
+          <div className="[-webkit-app-region:no-drag] flex shrink-0 items-center gap-2">
+            <Badge variant="secondary" size="sm">
+              Preview
+            </Badge>
+            <Button
+              size="icon-sm"
+              variant="ghost-muted"
+              aria-label="New Area"
+              onClick={() => setEditor("area")}
+            >
               <PlusIcon />
-              New Area
             </Button>
           </div>
-        </header>
-        <div className={styles["areas-body"]}>
-          <nav className={styles["area-switcher"]} aria-label="Your Areas">
-            {store.areas.map((item) => (
-              <button
-                type="button"
-                key={item.id}
-                aria-pressed={item.id === area?.id}
-                onClick={() => {
-                  setStore((current) => ({ ...current, selectedAreaId: item.id }));
-                  setSelectedId(null);
-                }}
-              >
-                {item.name}
-              </button>
-            ))}
-          </nav>
+        </WorkspacePageHeader>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 sm:px-6">
           {area ? (
             <>
-              <div className={styles["area-heading"]}>
-                <div>
-                  <p className={styles["area-eyebrow"]}>An ongoing body of work</p>
-                  <h1>{area.name}</h1>
-                  <p className={styles["area-goal"]}>
-                    {area.goal || "Give this work a direction on the canvas."}
-                  </p>
-                </div>
-                <div className={styles["area-heading-count"]}>
-                  <strong>{needsYou.length}</strong>
-                  <span>need you</span>
-                </div>
+              <div className="flex flex-wrap items-center justify-between gap-3 py-3">
+                <h1 className="sr-only">{area.name}</h1>
+                <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
+                  {area.goal || "Give this work a direction on the canvas."}
+                </p>
+                {needsYou.length > 0 ? (
+                  <Badge variant="warning" size="sm">
+                    {needsYou.length} need you
+                  </Badge>
+                ) : null}
               </div>
-              <div className={styles["area-toolbar"]}>
-                <div className={styles["area-views"]} role="group" aria-label="Area view">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
+                <ToggleGroup
+                  aria-label="Area view"
+                  value={[view]}
+                  onValueChange={(values) => {
+                    const next = VIEWS.find((item) => item === values[0]);
+                    if (next) setView(next);
+                  }}
+                >
                   {VIEWS.map((item) => (
-                    <button
-                      type="button"
-                      aria-pressed={view === item}
-                      key={item}
-                      onClick={() => setView(item)}
-                    >
+                    <Toggle key={item} value={item}>
                       {item}
-                    </button>
+                    </Toggle>
                   ))}
-                </div>
-                <span className={styles["area-preview-note"]}>
-                  Saved in this browser · No agents started
+                </ToggleGroup>
+                <span className="text-2xs text-muted-foreground">
+                  Local preview · No agents started
                 </span>
               </div>
-              <div className={styles["area-layout"]} data-view={view}>
+              <div
+                className={cn(
+                  "grid items-start gap-5",
+                  view === "Board"
+                    ? "grid-cols-1"
+                    : "grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px]",
+                )}
+                data-view={view}
+              >
                 <section
-                  className={styles["area-workspace"]}
+                  className="min-w-0"
                   aria-label={view === "Conversation" ? "Lead conversation" : "Area overview"}
                 >
                   {view === "Conversation" ? (
@@ -296,10 +343,12 @@ export function AreasPage() {
                           }
                         />
                       ) : null}
-                      <div className={styles["area-section-heading"]}>
+                      <div className="mb-3 flex items-center justify-between gap-3 [&_h2]:flex [&_h2]:items-center [&_h2]:gap-2 [&_h2]:text-xs [&_h2]:font-medium">
                         <h2>
                           {view === "Board" ? "Workstream board" : "Workstreams"}
-                          <span className={styles["area-muted"]}>{area.workstreams.length}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {area.workstreams.length}
+                          </span>
                         </h2>
                         <div className="flex gap-1">
                           <Button
@@ -323,13 +372,19 @@ export function AreasPage() {
                         </div>
                       </div>
                       {view === "Board" ? (
-                        <div className={styles["area-board"]}>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                           {WORKSTREAM_STATES.map((state) => (
-                            <section className={styles["area-board-column"]} key={state}>
+                            <section
+                              className="flex min-h-40 flex-col gap-2 rounded-lg bg-muted/30 p-2 [&_h3]:mb-1 [&_h3]:flex [&_h3]:items-center [&_h3]:gap-2 [&_h3]:px-1 [&_h3]:text-xs [&_h3]:font-medium"
+                              key={state}
+                            >
                               <h3>
-                                <span className={styles["area-dot"]} data-state={state} />
+                                <span
+                                  className="inline-block size-1.5 shrink-0 rounded-full bg-muted-foreground data-[state=needs-you]:bg-warning data-[state=working]:bg-info data-[state=done]:bg-success"
+                                  data-state={state}
+                                />
                                 {WORKSTREAM_LABELS[state]}
-                                <span className={styles["area-muted"]}>
+                                <span className="text-xs text-muted-foreground">
                                   {
                                     area.workstreams.filter((stream) => stateOf(stream) === state)
                                       .length
@@ -343,10 +398,12 @@ export function AreasPage() {
                           ))}
                         </div>
                       ) : (
-                        <div className={styles["area-stream-grid"]}>{cards(area.workstreams)}</div>
+                        <div className="grid grid-cols-1 gap-2 xl:grid-cols-2">
+                          {cards(area.workstreams)}
+                        </div>
                       )}
                       {area.workstreams.length === 0 ? (
-                        <div className={styles["area-empty"]}>
+                        <div className="flex flex-col items-center gap-3 px-5 py-12 text-center text-muted-foreground [&_p]:max-w-sm [&_p]:text-sm [&_p]:leading-relaxed [&_h3]:text-sm [&_h3]:font-medium [&_h3]:text-foreground">
                           <BoxesIcon size={28} />
                           <h3>Start with one outcome</h3>
                           <p>
@@ -359,14 +416,14 @@ export function AreasPage() {
                   )}
                 </section>
                 <aside
-                  className={styles["area-context"]}
+                  className="flex min-w-0 flex-col gap-3 border-t border-border pt-4 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-5"
                   aria-label={view === "Conversation" ? "Workstream context" : "Preview lead"}
                 >
                   {selected ? (
                     detail
                   ) : view === "Conversation" ? (
                     <>
-                      <div className={styles["area-section-heading"]}>
+                      <div className="mb-3 flex items-center justify-between gap-3 [&_h2]:flex [&_h2]:items-center [&_h2]:gap-2 [&_h2]:text-xs [&_h2]:font-medium">
                         <h2>Workstreams</h2>
                         <Button
                           size="sm"
@@ -389,8 +446,8 @@ export function AreasPage() {
                   )}
                 </aside>
               </div>
-              <footer className={styles["area-footer"]}>
-                Areas span repositories. Threads keep their own history. You keep the decisions.
+              <footer className="mt-5 flex items-center justify-between gap-3 border-t border-border pt-3 text-2xs text-muted-foreground">
+                Saved in this browser
                 <Button
                   size="sm"
                   variant="ghost"
@@ -413,7 +470,7 @@ export function AreasPage() {
               </footer>
             </>
           ) : (
-            <div className={styles["area-empty"]}>
+            <div className="flex flex-col items-center gap-3 px-5 py-12 text-center text-muted-foreground [&_p]:max-w-sm [&_p]:text-sm [&_p]:leading-relaxed [&_h3]:text-sm [&_h3]:font-medium [&_h3]:text-foreground">
               <BoxesIcon size={32} />
               <h1>A home for the bigger picture</h1>
               <p>Create an Area for an ongoing goal, then bring its workstreams together.</p>
@@ -446,7 +503,7 @@ export function AreasPage() {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
-            <div className={styles["area-attach-list"]}>
+            <div className="max-h-80 overflow-y-auto [&_button]:flex [&_button]:w-full [&_button]:cursor-pointer [&_button]:items-center [&_button]:justify-between [&_button]:gap-4 [&_button]:rounded-md [&_button]:px-2 [&_button]:py-2 [&_button]:text-left [&_button]:text-sm [&_button:hover]:bg-accent [&_button:focus-visible]:ring-2 [&_button:focus-visible]:ring-inset [&_button:focus-visible]:ring-ring [&_button:disabled]:cursor-default [&_button:disabled]:opacity-50 [&_small]:text-xs [&_small]:text-muted-foreground">
               {threads
                 .filter((thread) => thread.title.toLowerCase().includes(search.toLowerCase()))
                 .map((thread) => {
@@ -479,7 +536,7 @@ export function AreasPage() {
                 })}
               {threads.filter((thread) => thread.title.toLowerCase().includes(search.toLowerCase()))
                 .length === 0 ? (
-                <p className={styles["area-muted"]}>No matching loaded threads.</p>
+                <p className="text-xs text-muted-foreground">No matching loaded threads.</p>
               ) : null}
             </div>
           </div>
