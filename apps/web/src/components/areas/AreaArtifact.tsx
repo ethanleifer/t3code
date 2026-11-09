@@ -1,93 +1,107 @@
 import { useState } from "react";
-import { CodeIcon, ExpandIcon, EyeIcon } from "lucide-react";
+import { ArrowLeftIcon, CodeIcon, FileCodeIcon, PinIcon } from "lucide-react";
 import { AreaArtifactFrame } from "./AreaArtifactFrame";
 import { Button } from "../ui/button";
-import { Dialog, DialogPopup, DialogHeader, DialogTitle, DialogDescription } from "../ui/dialog";
+import {
+  Dialog,
+  DialogTrigger,
+  DialogClose,
+  DialogPopup,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "../ui/dialog";
 
 export function AreaArtifact({ html, onSave }: { html: string; onSave: (html: string) => void }) {
   const [editing, setEditing] = useState(false);
   const [source, setSource] = useState(html);
-  const [expanded, setExpanded] = useState(false);
   return (
-    <section className="mb-5 min-w-0" aria-label="Overview artifact">
-      <div className="mb-3 flex items-center justify-between gap-3 [&_h2]:flex [&_h2]:items-center [&_h2]:gap-2 [&_h2]:text-xs [&_h2]:font-medium">
-        <div>
-          <h2>Overview</h2>
-          <p className="mt-1 text-2xs text-muted-foreground">HTML artifact</p>
-        </div>
-        <div className="flex gap-1">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              if (!editing) setSource(html);
-              setEditing(!editing);
-            }}
-          >
-            {editing ? <EyeIcon /> : <CodeIcon />}
-            {editing ? "Cancel editing" : "Edit HTML"}
-          </Button>
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            aria-label="Expand overview canvas"
-            onClick={() => setExpanded(true)}
-          >
-            <ExpandIcon />
-          </Button>
-        </div>
-      </div>
-      {editing ? (
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            onSave(source);
-            setEditing(false);
-          }}
-        >
-          <label
-            className="mb-2 block text-xs text-muted-foreground"
-            htmlFor="area-artifact-source"
-          >
-            HTML, CSS, and JavaScript. Paste a complete document or a fragment.
-          </label>
-          <textarea
-            id="area-artifact-source"
-            className="min-h-96 w-full resize-y rounded-md border border-input bg-code p-3 font-mono text-xs leading-relaxed text-foreground outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-            spellCheck={false}
-            value={source}
-            onChange={(event) => setSource(event.target.value)}
+    <Dialog
+      onOpenChange={(open) => {
+        if (open) {
+          setEditing(false);
+          setSource(html);
+        }
+      }}
+    >
+      <DialogTrigger
+        aria-label="Open overview artifact"
+        render={
+          <button
+            type="button"
+            className="flex w-full cursor-pointer items-center gap-3 rounded-lg border border-border/60 bg-background px-3 py-2 text-left outline-none hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
           />
-          <div className="mt-2 flex items-center justify-between gap-3 [&_span]:text-2xs [&_span]:text-muted-foreground">
-            <span>Replace the whole canvas. There is no required structure.</span>
-            <Button size="sm" type="submit">
-              Save & render
-            </Button>
-          </div>
-        </form>
-      ) : (
-        <>
-          <div className="h-[520px] min-h-48 resize-y overflow-hidden rounded-lg border border-border bg-background">
-            <AreaArtifactFrame html={html} />
-          </div>
-          <p className="mt-1 text-2xs text-muted-foreground">
-            Drag the lower corner to resize. Expand for more room.
-          </p>
-        </>
-      )}
-      <Dialog open={expanded} onOpenChange={setExpanded}>
-        <DialogPopup className="w-[94vw] max-w-[1400px]">
-          <DialogHeader>
+        }
+      >
+        <FileCodeIcon className="size-4 shrink-0 text-icon-muted" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-xs font-medium">Overview</span>
+          <span className="block text-2xs text-muted-foreground">Freeform HTML artifact</span>
+        </span>
+        <PinIcon className="size-3 text-icon-muted" />
+        <span className="text-2xs text-muted-foreground">Open</span>
+      </DialogTrigger>
+      <DialogPopup className="w-[94vw] max-w-[1400px]" showCloseButton={false}>
+        <DialogHeader>
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <DialogTitle>Overview</DialogTitle>
-            <DialogDescription>
-              HTML, CSS, and JavaScript. Make this space your own.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="px-4 pb-4">
-            <AreaArtifactFrame html={html} expanded />
+            <div className="flex gap-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  if (!editing) setSource(html);
+                  setEditing(!editing);
+                }}
+              >
+                <CodeIcon />
+                {editing ? "Cancel editing" : "Edit HTML"}
+              </Button>
+              <DialogClose render={<Button size="sm" variant="outline" />}>
+                <ArrowLeftIcon />
+                Back to lead
+              </DialogClose>
+            </div>
           </div>
-        </DialogPopup>
-      </Dialog>
-    </section>
+          <DialogDescription>
+            HTML, CSS, and JavaScript. Make this space your own.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="min-h-0 overflow-y-auto px-4 pb-4">
+          {editing ? (
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                onSave(source);
+                setEditing(false);
+              }}
+            >
+              <label
+                className="mb-2 block text-xs text-muted-foreground"
+                htmlFor="area-artifact-source"
+              >
+                Paste a complete document or a fragment. No required structure.
+              </label>
+              <textarea
+                id="area-artifact-source"
+                className="h-[60dvh] min-h-48 w-full resize-y rounded-md border border-input bg-code p-3 font-mono text-xs leading-relaxed text-foreground outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                spellCheck={false}
+                value={source}
+                onChange={(event) => setSource(event.target.value)}
+              />
+              <div className="mt-2 flex justify-end">
+                <Button size="sm" type="submit">
+                  Save & render
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <div className="h-[65dvh] min-h-48 resize-y overflow-hidden rounded-lg border border-border bg-background">
+              <AreaArtifactFrame html={html} />
+            </div>
+          )}
+        </div>
+      </DialogPopup>
+    </Dialog>
   );
 }

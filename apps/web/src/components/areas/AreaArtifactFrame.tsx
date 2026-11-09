@@ -6,13 +6,7 @@ import {
 } from "@t3tools/shared/htmlRender";
 import { useHtmlRenderTheme } from "../../hooks/useHtmlRenderTheme";
 
-export function AreaArtifactFrame({
-  html,
-  expanded = false,
-}: {
-  html: string;
-  expanded?: boolean;
-}) {
+export function AreaArtifactFrame({ html }: { html: string }) {
   const theme = useHtmlRenderTheme();
   const frameRef = useRef<HTMLIFrameElement>(null);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- posts app palette and font changes to the sandboxed artifact
@@ -39,12 +33,8 @@ export function AreaArtifactFrame({
   return (
     <iframe
       ref={frameRef}
-      title={expanded ? "Expanded Area artifact" : "Area overview artifact"}
-      className={
-        expanded
-          ? "block h-[75dvh] w-full rounded-md border-0 bg-background"
-          : "block size-full border-0"
-      }
+      title="Area overview artifact"
+      className="block size-full border-0"
       srcDoc={injectHtmlRenderBootstrap(html)}
       sandbox="allow-scripts"
       referrerPolicy="no-referrer"

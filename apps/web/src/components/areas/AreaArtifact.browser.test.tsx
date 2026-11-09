@@ -1,4 +1,6 @@
 import { expect, it } from "vite-plus/test";
+import "~/index.css";
+import { page, userEvent } from "vite-plus/test/browser";
 import { render } from "../../../test/render";
 import { AreaArtifact } from "./AreaArtifact";
 
@@ -20,7 +22,13 @@ it("themes arbitrary artifact scripts while keeping the app document isolated", 
       onSave={() => {}}
     />,
   );
-  await expect.element(screen.getByRole("button", { name: "Edit HTML" })).toBeVisible();
+  await userEvent.click(screen.getByRole("button", { name: "Open overview artifact" }));
+  await expect.element(page.getByRole("button", { name: "Edit HTML" })).toBeVisible();
   expect(await ready).toBe("areas-artifact-isolated");
   expect(await themed).toBe("areas-theme-applied");
+  await userEvent.click(page.getByRole("button", { name: "Back to lead" }));
+  await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
+  await expect
+    .element(screen.getByRole("button", { name: "Open overview artifact" }))
+    .toHaveFocus();
 });

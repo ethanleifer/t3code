@@ -75,8 +75,8 @@ export const INITIAL_AREAS: typeof AreasPreviewState.Type = {
           id: "areas",
           title: "Explore the next level of work",
           summary:
-            "A shared brief, one lead conversation, and ordinary threads underneath. Compare three ways of seeing the same Area.",
-          nextAction: "Explore the overview, conversation, and workstream board.",
+            "A shared brief, one lead conversation, and ordinary threads underneath. Talk to the lead and open the shared artifact when you need the bigger picture.",
+          nextAction: "Open the shared artifact, inspect a workstream, and return to the lead.",
           updates: [
             "The overview is the starting point.",
             "Every workstream keeps its own context and handoff.",
