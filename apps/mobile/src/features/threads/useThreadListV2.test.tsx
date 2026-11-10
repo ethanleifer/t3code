@@ -41,6 +41,7 @@ it("reuses a large thread list across tab renders and updates when its inputs ch
   const environmentIds = new Set([environmentId, otherEnvironmentId]);
   const input: Parameters<typeof useThreadListV2>[0] = {
     threads,
+    tagFiltered: false,
     pendingTasks: [],
     environmentId: null,
     projectRefs: null,
@@ -241,4 +242,12 @@ it("reuses a large thread list across tab renders and updates when its inputs ch
   expect(loaded.layout.items).toHaveLength(160);
   expect(loaded.olderSettledShelf.isListed(threads[150]!)).toBe(true);
   expect(loaded.items).not.toBe(loading.items);
+
+  await act(async () =>
+    root.render(
+      <Probe input={{ ...input, tagFiltered: true, threads: [threads[150]!] }} tab="chats" />,
+    ),
+  );
+  expect(seen.at(-1)!.olderSettledShelf.visibleCount).toBe(0);
+  expect(seen.at(-1)!.layout.settledCount).toBe(1);
 });

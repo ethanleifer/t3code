@@ -45,6 +45,7 @@ function observeInbox(
  */
 export function useThreadListV2(input: {
   readonly threads: LayoutInput["threads"];
+  readonly tagFiltered: boolean;
   readonly pendingTasks: ReadonlyArray<PendingNewTask>;
   readonly environmentId: EnvironmentId | null;
   readonly projectRefs: LayoutInput["projectRefs"];
@@ -127,8 +128,9 @@ export function useThreadListV2(input: {
   const olderSettledShelf = useOlderSettledShelf({
     scopes,
     expanded: input.settledShelfExpanded,
-    // A search lists only matches, so the shelf would page forever; loaded pages stay.
-    visibleCount: input.searchQuery.trim().length === 0 ? input.settledLimit : 0,
+    // Filters can leave pages without matches; do not fetch the entire settled history.
+    visibleCount:
+      input.searchQuery.trim().length === 0 && !input.tagFiltered ? input.settledLimit : 0,
   });
   const { isListed, unloadedCount } = olderSettledShelf;
   const layout = useMemo(
@@ -152,21 +154,24 @@ export function useThreadListV2(input: {
         snoozedShelfExpanded: input.snoozedShelfExpanded,
         settledShelfExpanded: input.settledShelfExpanded,
         selectedThreadKey: input.selectedThreadKey,
-        isListedSettled: isListed,
-        unloadedSettledCount: unloadedCount(
-          threads.filter(
-            (thread) =>
-              thread.archivedAt === null &&
-              scopes.some(
-                (scope) =>
-                  scope.environmentId === thread.environmentId &&
-                  (scope.projectIds === null || scope.projectIds.includes(thread.projectId)),
+        ...(input.tagFiltered ? {} : { isListedSettled: isListed }),
+        unloadedSettledCount: input.tagFiltered
+          ? 0
+          : unloadedCount(
+              threads.filter(
+                (thread) =>
+                  thread.archivedAt === null &&
+                  scopes.some(
+                    (scope) =>
+                      scope.environmentId === thread.environmentId &&
+                      (scope.projectIds === null || scope.projectIds.includes(thread.projectId)),
+                  ),
               ),
-          ),
-        ),
+            ),
       }),
     [
       input.pendingOrder,
+      input.tagFiltered,
       threads,
       input.environmentId,
       input.projectRefs,
