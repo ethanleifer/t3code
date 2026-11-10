@@ -56,6 +56,7 @@ import { useLocation, useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeftIcon,
   BugIcon,
+  BoxesIcon,
   ChartNoAxesColumnIcon,
   CheckIcon,
   ChevronRightIcon,
@@ -1594,6 +1595,17 @@ function OpenCommandPaletteDialog(props: {
       },
     });
   }
+
+  actionItems.push({
+    kind: "action",
+    value: "action:areas",
+    title: "Open Areas",
+    searchTerms: ["areas", "lead", "overview", "artifact", "workstreams"],
+    icon: <BoxesIcon className={ITEM_ICON_CLASS} />,
+    run: async () => {
+      await navigate({ to: "/areas" });
+    },
+  });
 
   actionItems.push({
     kind: "action",

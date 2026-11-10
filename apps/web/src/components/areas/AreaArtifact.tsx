@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeftIcon, CodeIcon, FileCodeIcon, PinIcon, ExpandIcon } from "lucide-react";
+import { ArrowLeftIcon, CodeIcon, FileCodeIcon, ExpandIcon } from "lucide-react";
 import { AreaArtifactFrame } from "./AreaArtifactFrame";
 import { Button } from "../ui/button";
 import {
@@ -15,11 +15,11 @@ import {
 export function AreaArtifact({
   html,
   onSave,
-  variant = "pinned",
+  variant = "pane",
 }: {
   html: string;
   onSave: (html: string) => void;
-  variant?: "pinned" | "pane" | "expand";
+  variant?: "pane" | "expand";
 }) {
   const [editing, setEditing] = useState(false);
   const [source, setSource] = useState(html);
@@ -114,32 +114,12 @@ export function AreaArtifact({
         }
       }}
     >
-      {variant === "expand" ? (
-        <DialogTrigger
-          aria-label="Expand overview artifact"
-          render={<Button variant="ghost" size="icon-sm" />}
-        >
-          <ExpandIcon />
-        </DialogTrigger>
-      ) : (
-        <DialogTrigger
-          aria-label="Open overview artifact"
-          render={
-            <button
-              type="button"
-              className="flex w-full cursor-pointer items-center gap-3 rounded-lg border border-border/60 bg-background px-3 py-2 text-left outline-none hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-            />
-          }
-        >
-          <FileCodeIcon className="size-4 shrink-0 text-icon-muted" />
-          <span className="min-w-0 flex-1">
-            <span className="block text-xs font-medium">Overview</span>
-            <span className="block text-2xs text-muted-foreground">Freeform HTML artifact</span>
-          </span>
-          <PinIcon className="size-3 text-icon-muted" />
-          <span className="text-2xs text-muted-foreground">Open</span>
-        </DialogTrigger>
-      )}
+      <DialogTrigger
+        aria-label="Expand overview artifact"
+        render={<Button variant="ghost" size="icon-sm" />}
+      >
+        <ExpandIcon />
+      </DialogTrigger>
       <DialogPopup className="w-[94vw] max-w-[1400px]" showCloseButton={false}>
         <DialogHeader>
           <div className="flex flex-wrap items-center justify-between gap-2">

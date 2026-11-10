@@ -1,5 +1,5 @@
 import { randomUUID } from "../../lib/utils";
-import { EnvironmentId, ThreadId, type ScopedThreadRef } from "@t3tools/contracts";
+import { EnvironmentId, ThreadId, ScopedThreadRef } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
 import type { SidebarThreadSummary } from "../../types";
 import { resolveSidebarThreadStatus } from "../Sidebar.logic";
@@ -39,6 +39,7 @@ export const PreviewArea = Schema.Struct({
   goal: Schema.String,
   brief: Schema.String,
   artifactHtml: Schema.optionalKey(Schema.String),
+  leadThread: Schema.optionalKey(ScopedThreadRef),
   workstreams: Schema.Array(Workstream),
   messages: Schema.Array(Message),
 });

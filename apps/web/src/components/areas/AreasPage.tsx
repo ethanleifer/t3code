@@ -1,342 +1,168 @@
-import { useRef, useState } from "react";
-import { BoxesIcon, PanelRightIcon, PlusIcon } from "lucide-react";
-import { useLocalStorage } from "../../hooks/useLocalStorage";
-import { useMediaQuery } from "../../hooks/useMediaQuery";
+import { useState } from "react";
+import { BoxesIcon, PlusIcon, ArrowUpRightIcon } from "lucide-react";
+import type { PreviewArea } from "./areasPreview";
 import { useThreadShells } from "../../state/entities";
+import { useRightPanelStore } from "../../rightPanelStore";
+import { randomUUID } from "../../lib/utils";
+import { isElectron } from "../../env";
+import { WorkspacePageHeader } from "../WorkspacePageHeader";
+import { WorkspacePageContainer } from "../WorkspacePageContainer";
+import { WorkspaceBreadcrumb, WorkspaceBreadcrumbItem } from "../WorkspaceBreadcrumb";
+import { SidebarInset } from "../ui/sidebar";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
-import { Input } from "../ui/input";
-import { AreaArtifact } from "./AreaArtifact";
-import { createAreaArtifact } from "./areaArtifactTemplate";
-import { AreaLead } from "./AreaLead";
-import { AreaWorkstreams } from "./AreaWorkstreams";
-import { WorkspacePageHeader } from "../WorkspacePageHeader";
-import {
-  WorkspaceBreadcrumb,
-  WorkspaceBreadcrumbItem,
-  WorkspaceBreadcrumbSeparator,
-} from "../WorkspaceBreadcrumb";
-import { isElectron } from "../../env";
-import { Select, SelectTrigger, SelectValue, SelectPopup, SelectItem } from "../ui/select";
-import { SidebarInset } from "../ui/sidebar";
-import { Dialog, DialogPopup, DialogHeader, DialogTitle, DialogDescription } from "../ui/dialog";
 import { AreaEditor } from "./AreaEditor";
-import {
-  AREAS_PREVIEW_STORAGE_KEY,
-  AreasPreviewState,
-  INITIAL_AREAS,
-  attachAreaThread,
-  workstreamState,
-  type PreviewArea,
-} from "./areasPreview";
-import { randomUUID } from "../../lib/utils";
+import { AreaThreadPicker } from "./AreaThreadPicker";
+import { useAreasPreview, useOpenAreaConversation } from "./useAreasPreview";
 
 export function AreasPage() {
-  const [store, setStore] = useLocalStorage(
-    AREAS_PREVIEW_STORAGE_KEY,
-    INITIAL_AREAS,
-    AreasPreviewState,
-  );
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [panelOpen, setPanelOpen] = useState(false);
-  const [editor, setEditor] = useState<"area" | "workstream" | null>(null);
-  const [attaching, setAttaching] = useState(false);
-  const [search, setSearch] = useState("");
-  const composerRef = useRef<HTMLTextAreaElement>(null);
-  const wide = useMediaQuery("lg");
+  const [store, setStore] = useAreasPreview();
+  const [creating, setCreating] = useState(false);
+  const [choosing, setChoosing] = useState<PreviewArea | null>(null);
   const threads = useThreadShells();
-  const area = store.areas.find((item) => item.id === store.selectedAreaId) ?? store.areas[0];
-  const updateArea = (update: (current: PreviewArea) => PreviewArea) => {
-    if (!area) return;
-    setStore((current) => ({
-      ...current,
-      areas: current.areas.map((item) => (item.id === area.id ? update(item) : item)),
-    }));
-  };
-  const needsYou =
-    area?.workstreams.filter((stream) => {
-      const source = stream.source;
-      const thread =
-        source.kind === "thread"
-          ? threads.find(
-              (item) => item.environmentId === source.environmentId && item.id === source.threadId,
-            )
-          : undefined;
-      return workstreamState(stream, thread) === "needs-you";
-    }) ?? [];
-  const openWorkstream = (id: string) => {
-    setSelectedId(id);
-    setPanelOpen(true);
-  };
-  const backToLead = () => {
-    setSelectedId(null);
-    setPanelOpen(false);
-    composerRef.current?.focus();
-  };
-  const saveEditor = (name: string, text: string) => {
-    const id = randomUUID();
-    if (editor === "area") {
-      setStore((current) => ({
-        selectedAreaId: id,
-        areas: [
-          ...current.areas,
-          { id, name, goal: text, brief: text, messages: [], workstreams: [] },
-        ],
-      }));
-      setSelectedId(null);
-    } else {
-      updateArea((current) => ({
-        ...current,
-        workstreams: [
-          ...current.workstreams,
-          {
-            id,
-            title: name,
-            summary: text,
-            nextAction: "Define the next step for this workstream.",
-            updates: ["Added to this Area preview."],
-            source: { kind: "sample", state: "working" },
-          },
-        ],
-      }));
-      openWorkstream(id);
-    }
-    setEditor(null);
-  };
-  const workstreams = area ? (
-    <AreaWorkstreams
-      area={area}
-      threads={threads}
-      selectedId={selectedId}
-      onOpen={openWorkstream}
-      onBackToList={() => setSelectedId(null)}
-      onBackToLead={backToLead}
-      onAttach={() => {
-        setPanelOpen(false);
-        setSearch("");
-        setAttaching(true);
-      }}
-      onAdd={() => {
-        setPanelOpen(false);
-        setEditor("workstream");
-      }}
-      onUpdate={updateArea}
-      onDelete={() => {
-        if (
-          window.confirm(
-            `Delete the local preview Area “${area.name}”? Your original threads will be kept.`,
-          )
-        ) {
-          setStore((current) => ({
-            ...current,
-            areas: current.areas.filter((item) => item.id !== area.id),
-          }));
-          setPanelOpen(false);
-          setSelectedId(null);
-        }
-      }}
-    />
-  ) : null;
+  const openConversation = useOpenAreaConversation();
   return (
     <SidebarInset className="h-dvh min-h-0 overflow-hidden">
-      <div className="flex h-full min-h-0 flex-col bg-background text-foreground">
-        <WorkspacePageHeader electron={isElectron} className="border-b border-border bg-background">
-          <div className="[-webkit-app-region:no-drag] flex min-w-0 flex-1 items-center gap-2">
-            <WorkspaceBreadcrumb ariaLabel="Areas breadcrumb">
-              <WorkspaceBreadcrumbItem className="hidden sm:flex">
-                <BoxesIcon className="size-4" />
-                <span className="ml-2">Areas</span>
-              </WorkspaceBreadcrumbItem>
-              {area ? (
-                <>
-                  <WorkspaceBreadcrumbSeparator className="hidden sm:flex" />
-                  <WorkspaceBreadcrumbItem current>
-                    <Select
-                      value={area.id}
-                      onValueChange={(id) => {
-                        if (id !== null) {
-                          setStore((current) => ({ ...current, selectedAreaId: id }));
-                          setSelectedId(null);
-                          setPanelOpen(false);
-                        }
-                      }}
-                    >
-                      <SelectTrigger
-                        variant="ghost"
-                        size="compact"
-                        className="max-w-44 sm:max-w-none"
-                        aria-label="Choose Area"
-                      >
-                        <SelectValue>{area.name}</SelectValue>
-                      </SelectTrigger>
-                      <SelectPopup>
-                        {store.areas.map((item) => (
-                          <SelectItem value={item.id} key={item.id}>
-                            {item.name}
-                          </SelectItem>
-                        ))}
-                      </SelectPopup>
-                    </Select>
-                  </WorkspaceBreadcrumbItem>
-                </>
-              ) : null}
-            </WorkspaceBreadcrumb>
-          </div>
-          <div className="[-webkit-app-region:no-drag] flex shrink-0 items-center gap-2">
-            <div className="lg:hidden">
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                aria-label="Open workstreams"
-                onClick={() => setPanelOpen(true)}
-              >
-                <PanelRightIcon />
-              </Button>
-            </div>
-            <div className="hidden sm:block">
+      <WorkspacePageHeader electron={isElectron} className="border-b border-border">
+        <WorkspaceBreadcrumb ariaLabel="Areas">
+          <WorkspaceBreadcrumbItem current>
+            <BoxesIcon className="mr-2 size-4" />
+            <h1>Areas</h1>
+          </WorkspaceBreadcrumbItem>
+        </WorkspaceBreadcrumb>
+        <div className="ml-auto">
+          <Button variant="ghost" size="sm" onClick={() => setCreating(true)}>
+            <PlusIcon />
+            New Area
+          </Button>
+        </div>
+      </WorkspacePageHeader>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <WorkspacePageContainer>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-medium">An Area starts with a conversation</h2>
               <Badge variant="secondary" size="sm">
-                Local preview
+                Preview
               </Badge>
             </div>
-            <Button
-              size="icon-sm"
-              variant="ghost-muted"
-              aria-label="New Area"
-              onClick={() => setEditor("area")}
-            >
-              <PlusIcon />
-            </Button>
+            <p className="max-w-xl text-sm leading-relaxed text-muted-foreground">
+              Choose an existing T3 thread as the lead. Its chat stays exactly as it is, with the
+              Area’s overview and workstreams in the normal right panel.
+            </p>
           </div>
-        </WorkspacePageHeader>
-        {area ? (
-          <div className="flex min-h-0 flex-1">
-            <div className="min-h-0 min-w-0 flex-1">
-              <AreaLead
-                key={area.id}
-                area={area}
-                needsYou={needsYou}
-                onUpdate={updateArea}
-                onOpen={openWorkstream}
-                composerRef={composerRef}
-                wide={wide}
-                threads={threads}
-                onOpenOverview={() => {
-                  setSelectedId(null);
-                  setPanelOpen(false);
-                }}
-                onAttach={() => {
-                  setSearch("");
-                  setAttaching(true);
-                }}
-                onManage={() => {
-                  setSelectedId(null);
-                  setPanelOpen(true);
-                }}
-              />
-            </div>
-            {wide ? (
-              <aside
-                className="flex w-[45%] min-w-80 shrink-0 flex-col border-l border-border"
-                aria-label="Area context pane"
-              >
-                {panelOpen || selectedId ? (
-                  workstreams
-                ) : (
-                  <AreaArtifact
-                    key={area.id}
-                    variant="pane"
-                    html={area.artifactHtml ?? createAreaArtifact(area)}
-                    onSave={(artifactHtml) =>
-                      updateArea((current) => ({ ...current, artifactHtml }))
-                    }
-                  />
-                )}
-              </aside>
+          <div className="divide-y divide-border rounded-lg border border-border">
+            {store.areas.map((area) => {
+              const ref = area.leadThread;
+              const lead = ref
+                ? threads.find(
+                    (thread) =>
+                      thread.environmentId === ref.environmentId && thread.id === ref.threadId,
+                  )
+                : undefined;
+              return (
+                <section
+                  key={area.id}
+                  className="flex flex-wrap items-center justify-between gap-3 p-4"
+                >
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <h3 className="text-sm font-medium">{area.name}</h3>
+                    <p className="text-xs leading-relaxed text-muted-foreground">{area.goal}</p>
+                    {ref ? (
+                      <p className="text-2xs text-muted-foreground">
+                        Lead: {lead?.title ?? "Conversation not loaded"}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex gap-1">
+                    {ref ? (
+                      <>
+                        <Button size="sm" variant="ghost-muted" onClick={() => setChoosing(area)}>
+                          Change lead
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost-muted"
+                          onClick={() => {
+                            useRightPanelStore.getState().closeSurface(ref, `area:${area.id}`);
+                            setStore((current) => ({
+                              ...current,
+                              areas: current.areas.map((item) => {
+                                if (item.id !== area.id) return item;
+                                const { leadThread: _lead, ...rest } = item;
+                                return rest;
+                              }),
+                            }));
+                          }}
+                        >
+                          Disconnect
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openConversation(area, ref)}
+                        >
+                          Open Area
+                          <ArrowUpRightIcon />
+                        </Button>
+                      </>
+                    ) : (
+                      <Button size="sm" variant="outline" onClick={() => setChoosing(area)}>
+                        Choose conversation
+                      </Button>
+                    )}
+                  </div>
+                </section>
+              );
+            })}
+            {store.areas.length === 0 ? (
+              <p className="p-4 text-sm text-muted-foreground">
+                Create an Area to keep context alongside an existing thread.
+              </p>
             ) : null}
           </div>
-        ) : (
-          <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
-            <h1 className="text-lg font-medium">Start an Area</h1>
-            <p className="max-w-sm text-sm text-muted-foreground">
-              Keep a lead conversation, shared artifact, and workstream threads together.
-            </p>
-            <Button onClick={() => setEditor("area")}>Create an Area</Button>
-          </div>
-        )}
+          <p className="text-2xs text-muted-foreground">
+            Area context saves in this browser. Linking a conversation does not configure agent
+            coordination.
+          </p>
+        </WorkspacePageContainer>
       </div>
-      {!wide ? (
-        <Dialog open={panelOpen && !!area} onOpenChange={setPanelOpen}>
-          <DialogPopup showCloseButton={false} finalFocus={() => composerRef.current}>
-            <div className="sr-only">
-              <DialogTitle>Workstreams</DialogTitle>
-              <DialogDescription>Open a workstream or return to the Area lead.</DialogDescription>
-            </div>
-            <div className="flex h-[70dvh] min-h-0 flex-col">{workstreams}</div>
-          </DialogPopup>
-        </Dialog>
-      ) : null}
-      {editor ? (
+      {creating ? (
         <AreaEditor
-          key={`${editor}-${area?.id}`}
-          kind={editor}
-          onSave={saveEditor}
-          onClose={() => setEditor(null)}
+          kind="area"
+          onClose={() => setCreating(false)}
+          onSave={(name, text) => {
+            const area: PreviewArea = {
+              id: randomUUID(),
+              name,
+              goal: text,
+              brief: text,
+              workstreams: [],
+              messages: [],
+            };
+            setStore((current) => ({ areas: [...current.areas, area], selectedAreaId: area.id }));
+            setCreating(false);
+            setChoosing(area);
+          }}
         />
       ) : null}
-      <Dialog open={attaching} onOpenChange={setAttaching}>
-        <DialogPopup>
-          <DialogHeader>
-            <DialogTitle>Attach an existing thread</DialogTitle>
-            <DialogDescription>
-              Bring its status into this Area. The original conversation stays where it is.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 px-6 pb-6">
-            <Input
-              aria-label="Search threads"
-              placeholder="Search threads…"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-            <div className="max-h-80 overflow-y-auto [&_button]:flex [&_button]:w-full [&_button]:cursor-pointer [&_button]:items-center [&_button]:justify-between [&_button]:gap-4 [&_button]:rounded-md [&_button]:px-2 [&_button]:py-2 [&_button]:text-left [&_button]:text-sm [&_button:hover]:bg-accent [&_button:focus-visible]:ring-2 [&_button:focus-visible]:ring-inset [&_button:focus-visible]:ring-ring [&_button:disabled]:cursor-default [&_button:disabled]:opacity-50 [&_small]:text-xs [&_small]:text-muted-foreground">
-              {threads
-                .filter((thread) => thread.title.toLowerCase().includes(search.toLowerCase()))
-                .map((thread) => {
-                  const attached = area?.workstreams.some(
-                    (stream) =>
-                      stream.source.kind === "thread" &&
-                      stream.source.environmentId === thread.environmentId &&
-                      stream.source.threadId === thread.id,
-                  );
-                  return (
-                    <button
-                      type="button"
-                      disabled={attached}
-                      key={`${thread.environmentId}:${thread.id}`}
-                      onClick={() => {
-                        updateArea((current) =>
-                          attachAreaThread(
-                            current,
-                            { environmentId: thread.environmentId, threadId: thread.id },
-                            thread.title,
-                          ),
-                        );
-                        setAttaching(false);
-                      }}
-                    >
-                      <span>{thread.title}</span>
-                      <small>{attached ? "Attached" : "Attach"}</small>
-                    </button>
-                  );
-                })}
-              {threads.filter((thread) => thread.title.toLowerCase().includes(search.toLowerCase()))
-                .length === 0 ? (
-                <p className="text-xs text-muted-foreground">No matching loaded threads.</p>
-              ) : null}
-            </div>
-          </div>
-        </DialogPopup>
-      </Dialog>
+      {choosing ? (
+        <AreaThreadPicker
+          kind="lead"
+          onClose={() => setChoosing(null)}
+          onSelect={(ref) => {
+            setStore((current) => ({
+              ...current,
+              selectedAreaId: choosing.id,
+              areas: current.areas.map((area) =>
+                area.id === choosing.id ? { ...area, leadThread: ref } : area,
+              ),
+            }));
+            setChoosing(null);
+            openConversation(choosing, ref);
+          }}
+        />
+      ) : null}
     </SidebarInset>
   );
 }

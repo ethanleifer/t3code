@@ -40,6 +40,45 @@ async function reloadRightPanelStore() {
 }
 
 describe("rightPanelStore", () => {
+  it("keeps Area tabs scoped, persisted, and reopenable without replacing other panels", async () => {
+    const store = useRightPanelStore.getState();
+    const area = { areaId: "workflow", title: "Personal workflow" };
+    store.open(refA, "files");
+    store.openArea(refA, area);
+    store.openArea(refA, area);
+    expect(
+      selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refA).surfaces.map(
+        (surface) => surface.id,
+      ),
+    ).toEqual(["files", "area:workflow"]);
+    expect(
+      selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refB).surfaces,
+    ).toEqual([]);
+    await reloadRightPanelStore();
+    expect(selectActiveRightPanelSurface(useRightPanelStore.getState().byThreadKey, refA)).toEqual({
+      id: "area:workflow",
+      kind: "area",
+      ...area,
+    });
+    useRightPanelStore.getState().closeSurface(refA, "area:workflow");
+    expect(
+      selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refA).surfaces.map(
+        (surface) => surface.id,
+      ),
+    ).toEqual(["files"]);
+    const closed = useClosedViewStore.getState().entries[0];
+    if (closed === undefined) throw new Error("Area tab was not recorded as closed");
+    await reopenClosedView(closed, {
+      workspaceAvailable: true,
+      openPreview: () => {
+        throw new Error("An Area tab must not start a browser session");
+      },
+    });
+    expect(selectActiveRightPanelSurface(useRightPanelStore.getState().byThreadKey, refA)?.id).toBe(
+      "area:workflow",
+    );
+  });
+
   it("opens a hosted side chat's panel actions in its parent's panel until unhosted", () => {
     const store = useRightPanelStore.getState();
     const unhost = hostRightPanel(refB, refA);

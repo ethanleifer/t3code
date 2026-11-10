@@ -39,6 +39,7 @@ describe("Areas preview", () => {
           {
             ...area,
             brief: "A decision\n\nMore context",
+            leadThread: ref,
             artifactHtml:
               '<style>body{background:navy}</style><button onclick="this.textContent=1">Custom</button>',
             messages: [{ id: "note", role: "you", text: "Keep it simple" }],

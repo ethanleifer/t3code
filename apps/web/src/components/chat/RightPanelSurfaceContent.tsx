@@ -32,6 +32,9 @@ const DiffPanel = lazy(() => import("../DiffPanel"));
 const DevicePanel = lazy(() =>
   import("../device/DevicePanel").then((module) => ({ default: module.DevicePanel })),
 );
+const AreaPanel = lazy(() =>
+  import("../areas/AreaPanel").then((module) => ({ default: module.AreaPanel })),
+);
 const FilePreviewPanel = lazy(() => import("../files/FilePreviewPanel"));
 
 type RightPanelTerminalProps = Omit<
@@ -83,6 +86,12 @@ export function RightPanelSurfaceContent(props: {
   const { surface, threadRef, visible, onCloseSurface } = props;
   if (surface === null) return null;
   switch (surface.kind) {
+    case "area":
+      return (
+        <Suspense fallback={null}>
+          <AreaPanel areaId={surface.areaId} threadRef={threadRef} />
+        </Suspense>
+      );
     case "preview":
       return (
         <Suspense fallback={null}>
