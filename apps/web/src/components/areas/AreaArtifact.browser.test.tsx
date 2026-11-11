@@ -18,18 +18,17 @@ it("themes arbitrary artifact scripts while keeping the app document isolated", 
   const themed = waitForMessage(["areas-theme-applied", "areas-theme-missing"]);
   await using screen = await render(
     <AreaArtifact
-      variant="expand"
+      title="Area overview"
       html={`<!doctype html><button id="test">Interact</button><script>document.getElementById('test').onclick = function () { try { parent.document.body; parent.postMessage('areas-artifact-exposed', '*'); } catch { parent.postMessage('areas-artifact-isolated', '*'); } }; document.getElementById('test').click(); window.addEventListener('message', function(e) { var expected = e.data?.params?.styles?.variables; if (expected) parent.postMessage(getComputedStyle(document.documentElement).getPropertyValue('--background').trim() === expected['--background'] ? 'areas-theme-applied' : 'areas-theme-missing', '*'); });</script>`}
       onSave={() => {}}
     />,
   );
-  await userEvent.click(screen.getByRole("button", { name: "Expand overview artifact" }));
   await expect.element(page.getByRole("button", { name: "Edit HTML" })).toBeVisible();
   expect(await ready).toBe("areas-artifact-isolated");
   expect(await themed).toBe("areas-theme-applied");
-  await userEvent.click(page.getByRole("button", { name: "Back to lead" }));
+  await userEvent.click(screen.getByRole("button", { name: "Open full screen" }));
+  await expect.element(page.getByRole("button", { name: "Zoom in" })).toBeVisible();
+  await userEvent.click(page.getByRole("button", { name: "Close", exact: true }));
   await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
-  await expect
-    .element(screen.getByRole("button", { name: "Expand overview artifact" }))
-    .toHaveFocus();
+  await expect.element(screen.getByRole("button", { name: "Open full screen" })).toHaveFocus();
 });

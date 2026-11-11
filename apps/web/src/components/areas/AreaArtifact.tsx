@@ -1,143 +1,78 @@
-import { useState } from "react";
-import { ArrowLeftIcon, CodeIcon, FileCodeIcon, ExpandIcon } from "lucide-react";
-import { AreaArtifactFrame } from "./AreaArtifactFrame";
+import { useEffect, useState } from "react";
+import type { ScopedThreadRef } from "@t3tools/contracts";
+import { injectHtmlRenderBootstrap } from "@t3tools/shared/htmlRender";
+import { CodeIcon } from "lucide-react";
+import { HtmlRenderPreview } from "../chat/HtmlRenderPreview";
 import { Button } from "../ui/button";
-import {
-  Dialog,
-  DialogTrigger,
-  DialogClose,
-  DialogPopup,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "../ui/dialog";
 
 export function AreaArtifact({
   html,
+  title,
+  threadRef,
   onSave,
-  variant = "pane",
 }: {
   html: string;
+  title: string;
+  threadRef?: ScopedThreadRef;
   onSave: (html: string) => void;
-  variant?: "pane" | "expand";
 }) {
   const [editing, setEditing] = useState(false);
   const [source, setSource] = useState(html);
-  const editButton = (
-    <Button
-      size="sm"
-      variant="ghost"
-      onClick={() => {
-        if (!editing) setSource(html);
-        setEditing(!editing);
-      }}
-    >
-      <CodeIcon />
-      {editing ? "Cancel editing" : "Edit HTML"}
-    </Button>
-  );
-  const content = (
-    <div
-      className={
-        variant === "pane"
-          ? "flex min-h-0 flex-1 flex-col p-3"
-          : "min-h-0 overflow-y-auto px-4 pb-4"
-      }
-    >
+  const [src, setSrc] = useState<string | null>(null);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- owns the browser-local document URL and releases it when the saved source changes or unmounts
+  useEffect(() => {
+    const url = URL.createObjectURL(
+      new Blob([injectHtmlRenderBootstrap(html)], { type: "text/html" }),
+    );
+    // oxlint-disable-next-line react/set-state-in-effect -- publishes the document URL owned by this effect and its cleanup
+    setSrc(url);
+    return () => URL.revokeObjectURL(url);
+  }, [html]);
+  return (
+    <section aria-label="Overview artifact pane" className="flex h-full min-h-0 flex-col">
+      <div className="flex shrink-0 justify-end border-b border-border px-2 py-1">
+        <Button
+          size="sm"
+          variant="ghost-muted"
+          onClick={() => {
+            if (!editing) setSource(html);
+            setEditing(!editing);
+          }}
+        >
+          <CodeIcon />
+          {editing ? "Cancel editing" : "Edit HTML"}
+        </Button>
+      </div>
       {editing ? (
         <form
-          className="flex min-h-0 flex-1 flex-col"
+          className="flex min-h-0 flex-1 flex-col gap-2 p-3"
           onSubmit={(event) => {
             event.preventDefault();
             onSave(source);
             setEditing(false);
           }}
         >
-          <label
-            className="mb-2 block text-xs text-muted-foreground"
-            htmlFor="area-artifact-source"
-          >
-            Paste a complete document or a fragment. No required structure.
+          <label className="text-xs text-muted-foreground" htmlFor="area-artifact-source">
+            HTML source
           </label>
           <textarea
             id="area-artifact-source"
-            className={
-              variant === "pane"
-                ? "min-h-48 w-full flex-1 resize-none rounded-md border border-input bg-code p-3 font-mono text-xs leading-relaxed text-foreground outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                : "h-[60dvh] min-h-48 w-full resize-y rounded-md border border-input bg-code p-3 font-mono text-xs leading-relaxed text-foreground outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-            }
+            className="min-h-48 w-full flex-1 resize-none rounded-md border border-input bg-code p-3 font-mono text-xs leading-relaxed text-foreground outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
             spellCheck={false}
             value={source}
             onChange={(event) => setSource(event.target.value)}
           />
-          <div className="mt-2 flex justify-end">
+          <div className="flex justify-end">
             <Button size="sm" type="submit">
               Save & render
             </Button>
           </div>
         </form>
-      ) : (
-        <div
-          className={
-            variant === "pane"
-              ? "min-h-0 flex-1 overflow-hidden rounded-lg border border-border bg-background"
-              : "h-[65dvh] min-h-48 resize-y overflow-hidden rounded-lg border border-border bg-background"
-          }
-        >
-          <AreaArtifactFrame html={html} />
+      ) : src !== null ? (
+        <div className="min-h-0 flex-1">
+          <HtmlRenderPreview key={src} src={src} title={title} threadRef={threadRef} />
         </div>
-      )}
-    </div>
-  );
-  if (variant === "pane")
-    return (
-      <section aria-label="Overview artifact pane" className="flex h-full min-h-0 flex-col">
-        <header className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-4 py-3">
-          <h2 className="flex items-center gap-2 text-xs font-medium">
-            <FileCodeIcon className="size-3.5 text-icon-muted" />
-            Overview
-          </h2>
-          <div className="flex gap-1">
-            {editButton}
-            {!editing ? <AreaArtifact html={html} onSave={onSave} variant="expand" /> : null}
-          </div>
-        </header>
-        {content}
-      </section>
-    );
-  return (
-    <Dialog
-      onOpenChange={(open) => {
-        if (open) {
-          setEditing(false);
-          setSource(html);
-        }
-      }}
-    >
-      <DialogTrigger
-        aria-label="Expand overview artifact"
-        render={<Button variant="ghost" size="icon-sm" />}
-      >
-        <ExpandIcon />
-      </DialogTrigger>
-      <DialogPopup className="w-[94vw] max-w-[1400px]" showCloseButton={false}>
-        <DialogHeader>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <DialogTitle>Overview</DialogTitle>
-            <div className="flex gap-1">
-              {editButton}
-              <DialogClose render={<Button size="sm" variant="outline" />}>
-                <ArrowLeftIcon />
-                Back to lead
-              </DialogClose>
-            </div>
-          </div>
-          <DialogDescription>
-            HTML, CSS, and JavaScript. Make this space your own.
-          </DialogDescription>
-        </DialogHeader>
-        {content}
-      </DialogPopup>
-    </Dialog>
+      ) : null}
+    </section>
   );
 }

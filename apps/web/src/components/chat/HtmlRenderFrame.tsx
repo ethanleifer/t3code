@@ -5,17 +5,12 @@ import {
   htmlRenderFrameHeight,
   type HtmlRenderReference,
 } from "@t3tools/shared/htmlRender";
-import { Maximize2Icon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { useAssetUrlRefresh } from "~/assets/assetUrls";
 import { useLongLivedAssetUrl } from "~/assets/longLivedAssetUrls";
 
-import { HtmlRenderDocument } from "../files/BrowserDocumentFrame";
-import { Button } from "../ui/button";
-import { toastManager } from "../ui/toast";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
-import { HtmlRenderDialog } from "./HtmlRenderDialog";
+import { HtmlRenderPreview } from "./HtmlRenderPreview";
 import { observeResize } from "~/lib/observeResize";
 
 const MIN_URL_LIFE_MS = 5 * 60_000;
@@ -54,68 +49,19 @@ export function HtmlRenderFrame(props: {
   const src = loaded?.src ?? null;
   const failed = loaded === null && assetUrl._tag === "Failure";
   const refresh = useAssetUrlRefresh(props.environmentId, resource);
-  const [expandedSrc, setExpandedSrc] = useState<string | null>(null);
-  const { onFullscreenChange } = props;
-  // Tied to the viewer's lifetime: unmounting while expanded must still release
-  // the timeline's follow pin, which a close handler alone never reaches.
-  const expanded = expandedSrc !== null;
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- holds the parent's fullscreen pin while expanded and releases it on collapse or unmount
-  useEffect(() => {
-    if (!expanded) return;
-    onFullscreenChange?.(true);
-    return () => onFullscreenChange?.(false);
-  }, [expanded, onFullscreenChange]);
-
   return (
-    <div ref={observeBox} className="group/html-render relative" style={{ height }}>
+    <div ref={observeBox} style={{ height }}>
       {src !== null ? (
-        <>
-          <HtmlRenderDocument
-            src={src}
-            title={title}
-            threadRef={props.threadRef}
-            className="block size-full"
-            onContentHeight={setContentHeight}
-            onFullscreenChange={onFullscreenChange}
-          />
-          <div className="absolute end-2 top-2 flex gap-1 opacity-0 transition-opacity duration-150 focus-within:opacity-100 group-hover/html-render:opacity-100 pointer-coarse:opacity-100">
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    aria-label="Open full screen"
-                    size="icon-xs"
-                    variant="glass"
-                    onClick={async () => {
-                      const url =
-                        loaded !== null && loaded.expiresAt - Date.now() > MIN_URL_LIFE_MS
-                          ? src
-                          : await refresh().catch(() => null);
-                      if (url !== null) setExpandedSrc(url);
-                      else
-                        toastManager.add({
-                          type: "error",
-                          title: "Page unavailable",
-                          description: "Reconnect to the environment and try again.",
-                        });
-                    }}
-                  />
-                }
-              >
-                <Maximize2Icon className="size-3.5" />
-              </TooltipTrigger>
-              <TooltipPopup side="left">Open full screen</TooltipPopup>
-            </Tooltip>
-          </div>
-          {expandedSrc !== null ? (
-            <HtmlRenderDialog
-              src={expandedSrc}
-              title={title}
-              threadRef={props.threadRef}
-              onClose={() => setExpandedSrc(null)}
-            />
-          ) : null}
-        </>
+        <HtmlRenderPreview
+          src={src}
+          title={title}
+          threadRef={props.threadRef}
+          onContentHeight={setContentHeight}
+          onFullscreenChange={props.onFullscreenChange}
+          onExpand={async () =>
+            loaded !== null && loaded.expiresAt - Date.now() > MIN_URL_LIFE_MS ? src : refresh()
+          }
+        />
       ) : failed ? (
         <p className="flex size-full items-center justify-center text-muted-foreground text-xs">
           Unable to load {title}

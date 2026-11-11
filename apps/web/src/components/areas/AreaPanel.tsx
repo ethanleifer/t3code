@@ -74,7 +74,8 @@ export function AreaPanel({ areaId, threadRef }: { areaId: string; threadRef: Sc
         {view === "overview" ? (
           <AreaArtifact
             key={area.id}
-            variant="pane"
+            title={area.name}
+            threadRef={threadRef}
             html={area.artifactHtml ?? createAreaArtifact(area)}
             onSave={(artifactHtml) => updateArea((current) => ({ ...current, artifactHtml }))}
           />
