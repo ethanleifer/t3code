@@ -1,3 +1,4 @@
+import type { HtmlRenderReference } from "@t3tools/shared/htmlRender";
 import type { ScopedThreadRef } from "@t3tools/contracts";
 import { Maximize2Icon } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -10,6 +11,7 @@ import { HtmlRenderDialog } from "./HtmlRenderDialog";
 export function HtmlRenderPreview(props: {
   readonly src: string;
   readonly title: string;
+  readonly layout?: Pick<HtmlRenderReference, "height" | "heights">;
   readonly threadRef: ScopedThreadRef | undefined;
   readonly onContentHeight?: (height: number) => void;
   readonly onFullscreenChange?: ((fullscreen: boolean) => void) | undefined;
@@ -67,7 +69,7 @@ export function HtmlRenderPreview(props: {
       {expandedSrc !== null ? (
         <HtmlRenderDialog
           src={expandedSrc}
-          title={title}
+          htmlRender={{ title, height: 600, ...props.layout }}
           threadRef={props.threadRef}
           onClose={() => setExpandedSrc(null)}
         />

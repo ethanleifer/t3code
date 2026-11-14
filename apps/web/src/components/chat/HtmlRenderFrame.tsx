@@ -55,6 +55,7 @@ export function HtmlRenderFrame(props: {
         <HtmlRenderPreview
           src={src}
           title={title}
+          layout={props.htmlRender}
           threadRef={props.threadRef}
           onContentHeight={setContentHeight}
           onFullscreenChange={props.onFullscreenChange}
