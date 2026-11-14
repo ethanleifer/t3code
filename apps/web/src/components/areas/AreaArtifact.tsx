@@ -1,3 +1,4 @@
+import { toastManager } from "../ui/toast";
 import { useEffect, useState } from "react";
 import type { ScopedThreadRef } from "@t3tools/contracts";
 import { injectHtmlRenderBootstrap } from "@t3tools/shared/htmlRender";
@@ -14,9 +15,10 @@ export function AreaArtifact({
   html: string;
   title: string;
   threadRef?: ScopedThreadRef;
-  onSave: (html: string) => void;
+  onSave: (html: string) => void | boolean | Promise<boolean>;
 }) {
   const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [source, setSource] = useState(html);
   const [src, setSrc] = useState<string | null>(null);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- owns the browser-local document URL and releases it when the saved source changes or unmounts
@@ -48,8 +50,21 @@ export function AreaArtifact({
           className="flex min-h-0 flex-1 flex-col gap-2 p-3"
           onSubmit={(event) => {
             event.preventDefault();
-            onSave(source);
-            setEditing(false);
+            if (saving) return;
+            setSaving(true);
+            void Promise.resolve()
+              .then(() => onSave(source))
+              .then((saved) => {
+                if (saved !== false) setEditing(false);
+              })
+              .catch(() => {
+                toastManager.add({
+                  type: "error",
+                  title: "Could not save the overview",
+                  description: "Your HTML draft is still in the editor.",
+                });
+              })
+              .finally(() => setSaving(false));
           }}
         >
           <label className="text-xs text-muted-foreground" htmlFor="area-artifact-source">
@@ -63,7 +78,7 @@ export function AreaArtifact({
             onChange={(event) => setSource(event.target.value)}
           />
           <div className="flex justify-end">
-            <Button size="sm" type="submit">
+            <Button size="sm" type="submit" disabled={saving}>
               Save & render
             </Button>
           </div>

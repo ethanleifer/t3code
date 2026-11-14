@@ -1,3 +1,4 @@
+import * as AreaContext from "../../../areas/AreaContext.ts";
 import {
   type CommandId,
   type RuntimeRequestId,
@@ -90,7 +91,60 @@ const writesThread = <P extends { readonly threadId?: ThreadId | undefined }, A,
   handle: (params: P) => Effect.Effect<A, E, R>,
 ) => McpToolAccess.writesThreads((params: P) => [params.threadId], handle);
 
+const areaContext = Effect.fn("mcp.areaContext")(function* (
+  input:
+    | { action: "read" }
+    | {
+        action: "update";
+        expectedRevision: number;
+        brief?: string | undefined;
+        artifactHtml?: string | undefined;
+      },
+) {
+  const caller = yield* readCaller();
+  if (caller.caller === undefined)
+    return yield* new OrchestratorMcpFailure({
+      code: "invalid_request",
+      message: "Use area_context from an Area conversation.",
+    });
+  const service = yield* AreaContext.AreaContext;
+  const area = yield* service
+    .forThread(caller.caller.id)
+    .pipe(
+      Effect.mapError(
+        (error) =>
+          new OrchestratorMcpFailure({ code: "orchestration_error", message: error.message }),
+      ),
+    );
+  if (input.action === "read") return area;
+  if (area === null)
+    return yield* new OrchestratorMcpFailure({
+      code: "invalid_request",
+      message: "This thread is not connected to a shared Area.",
+    });
+  if (input.brief === undefined && input.artifactHtml === undefined) return area;
+  return yield* service
+    .save({
+      area: {
+        ...area,
+        ...(input.brief === undefined ? {} : { brief: input.brief }),
+        ...(input.artifactHtml === undefined ? {} : { artifactHtml: input.artifactHtml }),
+      },
+      expectedRevision: input.expectedRevision,
+    })
+    .pipe(
+      Effect.mapError(
+        (error) => new OrchestratorMcpFailure({ code: "invalid_request", message: error.message }),
+      ),
+    );
+});
+
 export const layer = McpToolAccess.toLayer(ThreadToolkit, {
+  area_context: McpToolAccess.either(
+    (input) => input.action === "read",
+    McpToolAccess.readsAsCaller(areaContext),
+    McpToolAccess.actsAsCaller(areaContext),
+  ),
   run_scheduled_task_now: McpToolAccess.writesEnvironment((input) =>
     Effect.gen(function* () {
       const scheduler = yield* ScheduledTasks.ScheduledTaskService;

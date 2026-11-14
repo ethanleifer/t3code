@@ -39,6 +39,7 @@ export const PreviewArea = Schema.Struct({
   goal: Schema.String,
   brief: Schema.String,
   artifactHtml: Schema.optionalKey(Schema.String),
+  shared: Schema.optionalKey(Schema.Boolean),
   leadThread: Schema.optionalKey(ScopedThreadRef),
   workstreams: Schema.Array(Workstream),
   messages: Schema.Array(Message),

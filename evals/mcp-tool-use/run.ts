@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 // @effect-diagnostics nodeBuiltinImport:off
+import { Area } from "@t3tools/contracts";
+import { areaTurnContext } from "../../apps/server/src/areas/areaPrompt.ts";
 /**
  * Replays small fake threads on a Claude or Codex model to check T3's MCP tool use. A trimmed
  * harness capture supplies the prompt and native tools; a cheap model plays the shell. See
@@ -310,6 +312,7 @@ export const McpToolUseCase = Schema.Struct({
     /** delegate_task `role` for a delegated child. T3 builds the child's first message from it. */
     delegateRole: Schema.optional(OrchestratorMcpTaskRole),
     context: Schema.optional(Schema.String),
+    area: Schema.optional(Area),
     priorTurns: Schema.optional(
       Schema.Array(
         Schema.Struct({
@@ -1048,6 +1051,15 @@ export const buildMessages = (sample: Sample) => {
       ? "You are a subagent started by the parent agent's Agent tool. Your final message goes to the parent agent, not to the user."
       : undefined,
     context,
+    testCase.setup.area === undefined
+      ? undefined
+      : areaTurnContext(
+          testCase.setup.area,
+          role === "delegated-child"
+            ? ThreadId.make("area-worker")
+            : testCase.setup.area.leadThreadId,
+          testCase.prompt,
+        ),
   ];
   const reminders = base.reminders.toSpliced(base.gitStatusAt, 0, reminder(gitStatus(testCase)));
   push("user", ...reminders, ...notes.flatMap((note) => (note ? [reminder(note)] : [])));

@@ -1,3 +1,4 @@
+import { ThreadRowLeadingStatus, ThreadRowTrailingStatus } from "../ThreadStatusIndicators";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeftIcon, ArrowUpRightIcon, MessageSquareIcon, PlusIcon } from "lucide-react";
 import type { SidebarThreadSummary } from "../../types";
@@ -154,6 +155,20 @@ export function AreaWorkstreams({
             {area.workstreams.map((stream) => {
               const thread = findThread(stream);
               const state = workstreamState(stream, thread);
+              if (thread)
+                return (
+                  <button
+                    key={stream.id}
+                    type="button"
+                    aria-label={`Open workstream: ${thread.title}`}
+                    onClick={() => onOpen(stream.id)}
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-2.5 text-left hover:bg-accent focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                  >
+                    <ThreadRowLeadingStatus thread={thread} />
+                    <span className="min-w-0 flex-1 truncate text-sm">{thread.title}</span>
+                    <ThreadRowTrailingStatus thread={thread} />
+                  </button>
+                );
               return (
                 <button
                   key={stream.id}
@@ -185,16 +200,20 @@ export function AreaWorkstreams({
               <Button size="sm" variant="outline" onClick={onAttach}>
                 Attach thread
               </Button>
-              <Button size="sm" variant="ghost-muted" onClick={onAdd}>
-                <PlusIcon />
-                Add sample
-              </Button>
+              {!area.shared ? (
+                <Button size="sm" variant="ghost-muted" onClick={onAdd}>
+                  <PlusIcon />
+                  Add sample
+                </Button>
+              ) : null}
             </div>
           </div>
         )}
       </div>
       <footer className="flex shrink-0 items-center justify-between gap-2 border-t border-border px-4 py-2">
-        <span className="text-2xs text-muted-foreground">Saved in this browser</span>
+        <span className="text-2xs text-muted-foreground">
+          {area.shared ? "Shared on the lead’s environment" : "Saved in this browser"}
+        </span>
         <Button size="sm" variant="ghost-muted" onClick={onDelete}>
           Delete Area
         </Button>

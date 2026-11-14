@@ -1,3 +1,5 @@
+import { Area, AreaContent, NonNegativeInt as AreaRevision } from "@t3tools/contracts";
+import * as AreaContext from "../../../areas/AreaContext.ts";
 import {
   OrchestratorMcpEnvironmentTarget,
   ScheduledTaskId,
@@ -243,7 +245,32 @@ const ScheduledTaskRunTool = Tool.make("run_scheduled_task_now", {
   .annotate(Tool.Destructive, true)
   .annotate(Tool.OpenWorld, true);
 
+const AreaContextTool = Tool.make("area_context", {
+  description:
+    "Read this thread's shared Area brief and HTML overview. To update them, first read the latest revision, then send action update with expectedRevision and the fields to replace. Other threads in the Area see saved changes on their next turn.",
+  parameters: Schema.Union([
+    Schema.Struct({ action: Schema.Literal("read") }),
+    Schema.Struct({
+      action: Schema.Literal("update"),
+      expectedRevision: AreaRevision,
+      brief: Schema.optional(AreaContent.fields.brief),
+      artifactHtml: Schema.optional(AreaContent.fields.artifactHtml),
+    }),
+  ]),
+  success: Schema.NullOr(Area),
+  failure: OrchestratorMcpFailure,
+  failureMode: "return" as const,
+  dependencies: [
+    McpInvocationContext.McpInvocationContext,
+    ThreadManagementService.ThreadManagementService,
+    AreaContext.AreaContext,
+  ],
+})
+  .annotate(Tool.Title, "Shared Area context")
+  .annotate(Tool.Strict, true);
+
 export const ThreadToolkit = Toolkit.make(
+  AreaContextTool,
   ScheduledTaskRunTool,
   ThreadSearchTool,
   ThreadConfigureTool,

@@ -1,3 +1,5 @@
+import * as AreaStore from "./areas/AreaStore.ts";
+import * as AreaContext from "./areas/AreaContext.ts";
 import { OrchestrationDispatchCommandError } from "@t3tools/contracts";
 // @effect-diagnostics-next-line nodeBuiltinImport:off -- A synchronous digest inside the pure provider mapping.
 import * as NodeCrypto from "node:crypto";
@@ -1529,6 +1531,8 @@ export const layerWsRpc = (
       const providerMaintenanceRunner = yield* ProviderMaintenanceRunner.ProviderMaintenanceRunner;
       const providerAuth = yield* ProviderAuthService.ProviderAuthService;
       const providerInstallation = yield* ProviderInstallation.ProviderInstallation;
+      const areaStore = yield* AreaStore.AreaStore;
+      const areaContext = yield* AreaContext.AreaContext;
       const serverSelfUpdate = yield* ServerSelfUpdate.ServerSelfUpdate;
       const npmRelease = yield* NpmRelease.NpmRelease;
       const config = yield* ServerConfig.ServerConfig;
@@ -2949,6 +2953,9 @@ export const layerWsRpc = (
                 }),
             ),
           ),
+        [WS_METHODS.areasList]: () => areaStore.list(),
+        [WS_METHODS.areasSave]: (input) => areaContext.save(input),
+        [WS_METHODS.areasRemove]: (input) => areaStore.remove(input),
         [WS_METHODS.projectsReadFile]: (input) =>
           workspaceFileSystem.readFile(input).pipe(
             Effect.mapError(
@@ -3515,6 +3522,8 @@ export const WS_RPC_SERVER_OPTIONS = {
 export const layer = Layer.unwrap(
   Effect.gen(function* () {
     const serverBrowser = yield* ServerBrowser.ServerBrowser;
+    const areaStore = yield* AreaStore.AreaStore;
+    const areaContext = yield* AreaContext.AreaContext;
     const serverSelfUpdate = yield* ServerSelfUpdate.ServerSelfUpdate;
     const npmRelease = yield* NpmRelease.NpmRelease;
     const pullRequests = yield* PullRequestService.PullRequestService;
@@ -3594,6 +3603,8 @@ export const layer = Layer.unwrap(
               Layer.provideMerge(RpcSerialization.layerJson),
               // Handler-context reporters see only request defects, not server-wide defects.
               Layer.provide(DefectReporter.layer),
+              Layer.provide(Layer.succeed(AreaStore.AreaStore, areaStore)),
+              Layer.provide(Layer.succeed(AreaContext.AreaContext, areaContext)),
               Layer.provide(Layer.succeed(SqlClient.SqlClient, sql)),
               Layer.provide(AcpRegistrySessions.layer),
               Layer.provide(ProviderMaintenanceRunner.layer),

@@ -1,3 +1,4 @@
+import { SharedAreas } from "./SharedAreas";
 import { useState } from "react";
 import { BoxesIcon, PlusIcon, ArrowUpRightIcon } from "lucide-react";
 import type { PreviewArea } from "./areasPreview";
@@ -51,70 +52,74 @@ export function AreasPage() {
               Area’s overview and workstreams in the normal right panel.
             </p>
           </div>
+          <SharedAreas />
+          <p className="text-xs text-muted-foreground">Local drafts</p>
           <div className="divide-y divide-border rounded-lg border border-border">
-            {store.areas.map((area) => {
-              const ref = area.leadThread;
-              const lead = ref
-                ? threads.find(
-                    (thread) =>
-                      thread.environmentId === ref.environmentId && thread.id === ref.threadId,
-                  )
-                : undefined;
-              return (
-                <section
-                  key={area.id}
-                  className="flex flex-wrap items-center justify-between gap-3 p-4"
-                >
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <h3 className="text-sm font-medium">{area.name}</h3>
-                    <p className="text-xs leading-relaxed text-muted-foreground">{area.goal}</p>
-                    {ref ? (
-                      <p className="text-2xs text-muted-foreground">
-                        Lead: {lead?.title ?? "Conversation not loaded"}
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="flex gap-1">
-                    {ref ? (
-                      <>
-                        <Button size="sm" variant="ghost-muted" onClick={() => setChoosing(area)}>
-                          Change lead
+            {store.areas
+              .filter((area) => !area.shared)
+              .map((area) => {
+                const ref = area.leadThread;
+                const lead = ref
+                  ? threads.find(
+                      (thread) =>
+                        thread.environmentId === ref.environmentId && thread.id === ref.threadId,
+                    )
+                  : undefined;
+                return (
+                  <section
+                    key={area.id}
+                    className="flex flex-wrap items-center justify-between gap-3 p-4"
+                  >
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <h3 className="text-sm font-medium">{area.name}</h3>
+                      <p className="text-xs leading-relaxed text-muted-foreground">{area.goal}</p>
+                      {ref ? (
+                        <p className="text-2xs text-muted-foreground">
+                          Lead: {lead?.title ?? "Conversation not loaded"}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="flex gap-1">
+                      {ref ? (
+                        <>
+                          <Button size="sm" variant="ghost-muted" onClick={() => setChoosing(area)}>
+                            Change lead
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost-muted"
+                            onClick={() => {
+                              useRightPanelStore.getState().closeSurface(ref, `area:${area.id}`);
+                              setStore((current) => ({
+                                ...current,
+                                areas: current.areas.map((item) => {
+                                  if (item.id !== area.id) return item;
+                                  const { leadThread: _lead, ...rest } = item;
+                                  return rest;
+                                }),
+                              }));
+                            }}
+                          >
+                            Disconnect
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openConversation(area, ref)}
+                          >
+                            Open Area
+                            <ArrowUpRightIcon />
+                          </Button>
+                        </>
+                      ) : (
+                        <Button size="sm" variant="outline" onClick={() => setChoosing(area)}>
+                          Choose conversation
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost-muted"
-                          onClick={() => {
-                            useRightPanelStore.getState().closeSurface(ref, `area:${area.id}`);
-                            setStore((current) => ({
-                              ...current,
-                              areas: current.areas.map((item) => {
-                                if (item.id !== area.id) return item;
-                                const { leadThread: _lead, ...rest } = item;
-                                return rest;
-                              }),
-                            }));
-                          }}
-                        >
-                          Disconnect
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openConversation(area, ref)}
-                        >
-                          Open Area
-                          <ArrowUpRightIcon />
-                        </Button>
-                      </>
-                    ) : (
-                      <Button size="sm" variant="outline" onClick={() => setChoosing(area)}>
-                        Choose conversation
-                      </Button>
-                    )}
-                  </div>
-                </section>
-              );
-            })}
+                      )}
+                    </div>
+                  </section>
+                );
+              })}
             {store.areas.length === 0 ? (
               <p className="p-4 text-sm text-muted-foreground">
                 Create an Area to keep context alongside an existing thread.
@@ -122,8 +127,8 @@ export function AreasPage() {
             ) : null}
           </div>
           <p className="text-2xs text-muted-foreground">
-            Area context saves in this browser. Linking a conversation does not configure agent
-            coordination.
+            Drafts stay in this browser. Enable coordination from an Area to share its brief and
+            overview with the lead and its workstreams.
           </p>
         </WorkspacePageContainer>
       </div>

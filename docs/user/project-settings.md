@@ -46,6 +46,12 @@ Settings that are environment-wide stay read-only while a project is selected. W
 targets disagree, a control shows **Mixed** until you choose one value. Appearance, keyboard,
 and other phone-only settings ignore the filter.
 
+## Areas (preview)
+
+An Area keeps one ongoing conversation, a shared brief, an HTML overview, and related workstreams together. On web or desktop, open **Areas** from the command palette, create an Area, choose its lead conversation, and enable coordination. Send work in the normal lead conversation; it can delegate workstreams and receive their results there.
+
+The brief and overview save on the lead’s environment and are available to its delegated workstreams on their next turn. You can edit them in the Area panel or ask the lead to update them. Workstreams open as normal conversations. Shared Areas are available from other browsers connected to that environment; local drafts remain in the browser that created them. Workstreams on other environments do not share this context. Stop sharing to keep a local draft without deleting the conversations.
+
 ## Pin and archive projects
 
 Pinned projects come first in the project pickers: the project picker on a new thread, the

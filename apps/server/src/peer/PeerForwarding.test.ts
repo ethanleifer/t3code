@@ -1,3 +1,4 @@
+import * as AreaContext from "../areas/AreaContext.ts";
 import * as DocumentText from "../provider/DocumentText.ts";
 import { NodeHttpServer } from "@effect/platform-node";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
@@ -222,7 +223,7 @@ const serveBox = (seen: Ref.Ref<Seen>, linkSession: Ref.Ref<string>) =>
     Layer.mergeAll(
       McpHttpServer.layerOrchestratorToolkit,
       McpHttpServer.layerProjectRegistration,
-      McpHttpServer.layerThreadToolkit,
+      McpHttpServer.layerThreadToolkit.pipe(Layer.provide(Layer.mock(AreaContext.AreaContext)({}))),
     ).pipe(
       Layer.provide(DocumentText.layer.pipe(Layer.provideMerge(NodeServices.layer))),
       Layer.provide(NodeCrypto.layer),
@@ -277,7 +278,7 @@ const makeLaptop = Effect.gen(function* () {
   const layerHere = Layer.mergeAll(
     McpHttpServer.layerOrchestratorToolkit,
     McpHttpServer.layerProjectRegistration,
-    McpHttpServer.layerThreadToolkit,
+    McpHttpServer.layerThreadToolkit.pipe(Layer.provide(Layer.mock(AreaContext.AreaContext)({}))),
   ).pipe(
     Layer.provide(DocumentText.layer.pipe(Layer.provideMerge(NodeServices.layer))),
     Layer.provideMerge(McpHttpServer.layerInProcessMcpServer),

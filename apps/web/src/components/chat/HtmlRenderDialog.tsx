@@ -15,7 +15,9 @@ import { Dialog, DialogPopup, DialogTitle } from "../ui/dialog";
 
 export function HtmlRenderDialog(props: {
   readonly src: string;
-  readonly htmlRender: Pick<HtmlRenderReference, "title" | "height" | "heights">;
+  readonly htmlRender: Omit<HtmlRenderReference, "attachmentId"> & {
+    readonly attachmentId?: string;
+  };
   readonly threadRef?: ScopedThreadRef | undefined;
   readonly onClose: () => void;
 }) {

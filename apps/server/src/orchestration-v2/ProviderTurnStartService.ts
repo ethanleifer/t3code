@@ -1,3 +1,5 @@
+import { areaTurnContext } from "../areas/areaPrompt.ts";
+import * as AreaContext from "../areas/AreaContext.ts";
 import { modelSelectionsEqual } from "@t3tools/shared/model";
 import { projectComposerContextForProvider } from "@t3tools/shared/composerContextReferences";
 import {
@@ -132,6 +134,7 @@ export class ProviderTurnStartServiceV2 extends Context.Service<
 export const layer: Layer.Layer<
   ProviderTurnStartServiceV2,
   never,
+  | AreaContext.AreaContext
   | EventSink.EventSinkV2
   | ContextHandoffService.ContextHandoffServiceV2
   | IdAllocator.IdAllocatorV2
@@ -159,6 +162,7 @@ export const layer: Layer.Layer<
     const projects = yield* ProjectService.ProjectService;
     const providerAuth = yield* ProviderAuthService.ProviderAuthService;
     const projectionStore = yield* ProjectionStore.ProjectionStoreV2;
+    const areas = yield* AreaContext.AreaContext;
     const providerSessions = yield* ProviderSessionManager.ProviderSessionManagerV2;
     const runExecution = yield* RunExecutionService.RunExecutionServiceV2;
     const runtimePolicy = yield* RuntimePolicy.RuntimePolicyV2;
@@ -1635,7 +1639,14 @@ export const layer: Layer.Layer<
             sideChatHandoff === undefined || compact || goalCommand
               ? ""
               : sideChatHandoff.summaryText;
-          const context = [delivery.context, sideChatContext, restartNote]
+          const area =
+            compact || userText.trimStart().startsWith("/")
+              ? null
+              : yield* areas
+                  .forThread(input.threadId)
+                  .pipe(Effect.mapError((cause) => new ProviderTurnStartError({ runId, cause })));
+          const areaContext = area === null ? "" : areaTurnContext(area, input.threadId, userText);
+          const context = [delivery.context, sideChatContext, restartNote, areaContext]
             .filter((part) => part !== "")
             .join("\n\n");
           const { restartContinuationOfRunId: _resumedRunId, ...promptedInput } = turnInput;

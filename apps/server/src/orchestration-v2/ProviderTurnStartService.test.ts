@@ -1,3 +1,4 @@
+import * as AreaContext from "../areas/AreaContext.ts";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it, vi } from "vite-plus/test";
@@ -138,6 +139,7 @@ function startWithMissingWorktree(
   const layer = ProviderTurnStart.layer.pipe(
     Layer.provide(
       Layer.mergeAll(
+        Layer.mock(AreaContext.AreaContext)({ forThread: () => Effect.succeed(null) }),
         Layer.mock(ContextHandoffService.ContextHandoffServiceV2)({}),
         Layer.mock(EventSink.EventSinkV2)({ writeIfRunCurrent }),
         IdAllocator.layer,
@@ -950,6 +952,7 @@ function makeLocalCommandHarness(input: {
   const layer = ProviderTurnStart.layer.pipe(
     Layer.provide(
       Layer.mergeAll(
+        Layer.mock(AreaContext.AreaContext)({ forThread: () => Effect.succeed(null) }),
         Layer.mock(ContextHandoffService.ContextHandoffServiceV2)({
           prepareProviderHandoff: (handoff) =>
             input.sideChat?.nativeForkFrom === undefined

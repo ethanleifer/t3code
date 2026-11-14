@@ -1,3 +1,5 @@
+import * as AreaStore from "../../areas/AreaStore.ts";
+import * as AreaContext from "../../areas/AreaContext.ts";
 import * as OtelEnvironment from "@t3tools/shared/otelEnvironment";
 import { DEFAULT_SIGNAL_EXPORT } from "@t3tools/shared/observability";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
@@ -437,6 +439,10 @@ export function layerWithRegistry<Error>(
   const layerProviderTurnStartServiceProvided = ProviderTurnStartService.layer.pipe(
     Layer.provide(
       Layer.mergeAll(
+        AreaContext.layer.pipe(
+          Layer.provide(AreaStore.layer.pipe(Layer.provide(layerServerConfig))),
+          Layer.provide(layerDatabase),
+        ),
         layerContextHandoffServiceProvided,
         layerEventSinkProvided,
         IdAllocator.layer,

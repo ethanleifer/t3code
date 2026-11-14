@@ -197,6 +197,8 @@ describe("command permissions", () => {
   );
 
   it.effect.each([
+    WS_METHODS.areasSave,
+    WS_METHODS.areasRemove,
     WS_METHODS.scheduledTasksDelete,
     ORCHESTRATION_V2_WS_METHODS.stopWorkflow,
     ORCHESTRATION_V2_WS_METHODS.dispatchCommand,

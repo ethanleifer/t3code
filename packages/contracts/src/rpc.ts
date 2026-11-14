@@ -1,3 +1,4 @@
+import { Area, AreaId, AreaError, AreaSaveInput } from "./area.ts";
 import {
   OrchestrationV2SearchThreadError,
   OrchestrationV2SearchThreadInput,
@@ -415,6 +416,9 @@ import { VcsError } from "./vcs.ts";
 import { Project, ProjectMutation, ProjectMutationError } from "./project.ts";
 
 export const WS_METHODS = {
+  areasList: "areas.list",
+  areasSave: "areas.save",
+  areasRemove: "areas.remove",
   projectsListEntries: "projects.listEntries",
   projectsListIgnoredFiles: "projects.listIgnoredFiles",
   projectsReadFile: "projects.readFile",
@@ -1388,6 +1392,22 @@ const WsProjectsListIgnoredFilesRpc = Rpc.make(WS_METHODS.projectsListIgnoredFil
   error: Schema.Union([ProjectListEntriesError, EnvironmentAuthorizationError]),
 });
 
+const WsAreasListRpc = Rpc.make(WS_METHODS.areasList, {
+  payload: Schema.Struct({}),
+  success: Schema.Array(Area),
+  error: Schema.Union([AreaError, EnvironmentAuthorizationError]),
+});
+const WsAreasSaveRpc = Rpc.make(WS_METHODS.areasSave, {
+  payload: AreaSaveInput,
+  success: Area,
+  error: Schema.Union([AreaError, EnvironmentAuthorizationError]),
+});
+const WsAreasRemoveRpc = Rpc.make(WS_METHODS.areasRemove, {
+  payload: Schema.Struct({ id: AreaId, expectedRevision: Area.fields.revision }),
+  success: Schema.Void,
+  error: Schema.Union([AreaError, EnvironmentAuthorizationError]),
+});
+
 const WsProjectsReadFileRpc = Rpc.make(WS_METHODS.projectsReadFile, {
   payload: ProjectReadFileInput,
   success: ProjectReadFileResult,
@@ -2225,6 +2245,9 @@ export const WsRpcGroup = RpcGroup.make(
   WsSubscribeProjectClonesRpc,
   WsProjectsListEntriesRpc,
   WsProjectsListIgnoredFilesRpc,
+  WsAreasListRpc,
+  WsAreasSaveRpc,
+  WsAreasRemoveRpc,
   WsProjectsReadFileRpc,
   WsProjectsSearchContentsRpc,
   WsProjectsSearchEntriesRpc,
