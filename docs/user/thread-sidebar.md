@@ -6,11 +6,18 @@ need a separate branch and working directory.
 ## Organize threads with tags
 
 On web and desktop, open **Settings → Tags** and select an environment to create tags or change
-their colors. Tag names are case-sensitive. Choose a preset color or use a custom color.
+their colors and optional categories. Tag and category names are case-sensitive. Choose a preset
+color or use a custom color.
 
 Apply or remove tags from a thread's **Tags** menu in the sidebar or chat header. Select several
 threads to change their tags together. Across environments, the menu offers tags defined on every
 selected environment. Deleting a definition removes that tag from all threads in its environment.
+
+To organize the sidebar by topic, give your topic tags the category **Topic** in Settings, then
+choose **Group by → Topic tags** from the sidebar's tag menu. A thread appears under each of its
+matching topic tags; threads without one appear under **No topic**. Choose **Sort within groups →
+Status** to order each topic by T3's built-in agent status. Pins stay first, and settled threads
+stay in their own section. **All tags** groups by every tag regardless of category.
 
 ## Start a thread
 
