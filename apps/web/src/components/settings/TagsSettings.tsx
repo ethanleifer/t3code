@@ -9,7 +9,7 @@ import {
   isManagedSettingPath,
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useEnvironmentSettings } from "../../hooks/useSettings";
 import { useThreadShells } from "../../state/entities";
 import { serverEnvironment } from "../../state/server";
@@ -102,6 +102,16 @@ function EnvironmentTagsSettings({
   const persist = useAtomCommand(serverEnvironment.updateSettings);
   const [pending, setPending] = useState(false);
   const [name, setName] = useState("");
+  const [category, setCategory] = useState("Topic");
+  const categoryOptionsId = useId();
+  const categories = [
+    ...new Set([
+      "Topic",
+      "Workflow",
+      ...definitions.flatMap((definition) => (definition.category ? [definition.category] : [])),
+    ]),
+  ];
+  const validCategory = category.trim() === "" || isThreadTag(category.trim());
   const [color, setColor] = useState<ThreadTagColor>(THREAD_TAG_COLOR_PRESETS[0]);
   const [deleting, setDeleting] = useState<ThreadTagDefinition | null>(null);
   const validName =
@@ -126,22 +136,28 @@ function EnvironmentTagsSettings({
     <SettingsSection {...searchableSetting("thread-tags")}>
       <SettingsRow
         title="Tag definitions"
-        description="Create tags for this environment, then apply them from a thread's Tags menu. Names are case-sensitive."
+        description="Create tags for this environment, then apply them from a thread's Tags menu. Use optional categories such as Topic to group related tags. Names are case-sensitive."
         serverScoped
         settingKeys={["threadTagDefinitions"]}
       >
         <fieldset disabled={disabled} className="space-y-4 pb-3">
+          <datalist id={categoryOptionsId}>
+            {categories.map((entry) => (
+              <option key={entry} value={entry} />
+            ))}
+          </datalist>
           {definitions.length === 0 ? (
             <p className="text-xs text-muted-foreground">No tags yet.</p>
           ) : null}
           {definitions.map((definition) => (
             <TagDefinitionEditor
-              key={`${definition.name}:${definition.color}`}
+              key={JSON.stringify([definition.name, definition.color, definition.category])}
               definition={definition}
-              onSave={(nextColor) =>
+              categoryOptionsId={categoryOptionsId}
+              onSave={(nextDefinition) =>
                 save(
                   definitions.map((entry) =>
-                    entry.name === definition.name ? { ...entry, color: nextColor } : entry,
+                    entry.name === definition.name ? nextDefinition : entry,
                   ),
                 )
               }
@@ -152,9 +168,21 @@ function EnvironmentTagsSettings({
             className="space-y-3 border-t border-border pt-3"
             onSubmit={(event) => {
               event.preventDefault();
-              if (!validName || disabled || definitions.length >= MAX_THREAD_TAG_DEFINITIONS)
+              if (
+                !validName ||
+                !validCategory ||
+                disabled ||
+                definitions.length >= MAX_THREAD_TAG_DEFINITIONS
+              )
                 return;
-              void save([...definitions, { name: name.trim(), color }]).then((saved) => {
+              void save([
+                ...definitions,
+                {
+                  name: name.trim(),
+                  color,
+                  ...(category.trim() ? { category: category.trim() } : {}),
+                },
+              ]).then((saved) => {
                 if (saved) {
                   setName("");
                   setColor(THREAD_TAG_COLOR_PRESETS[0]);
@@ -169,12 +197,22 @@ function EnvironmentTagsSettings({
               maxLength={64}
               onChange={(event) => setName(event.currentTarget.value)}
             />
+            <Input
+              aria-label="New tag category"
+              placeholder="Category (optional)"
+              list={categoryOptionsId}
+              value={category}
+              maxLength={64}
+              onChange={(event) => setCategory(event.currentTarget.value)}
+            />
             <TagColorPicker value={color} onChange={setColor} label="New tag color" />
             <Button
               type="submit"
               size="sm"
               variant="outline"
-              disabled={!validName || definitions.length >= MAX_THREAD_TAG_DEFINITIONS}
+              disabled={
+                !validName || !validCategory || definitions.length >= MAX_THREAD_TAG_DEFINITIONS
+              }
             >
               Create tag
             </Button>
@@ -230,20 +268,30 @@ function EnvironmentTagsSettings({
 
 function TagDefinitionEditor({
   definition,
+  categoryOptionsId,
   onSave,
   onDelete,
 }: {
   definition: ThreadTagDefinition;
-  onSave: (color: ThreadTagColor) => Promise<boolean>;
+  categoryOptionsId: string;
+  onSave: (definition: ThreadTagDefinition) => Promise<boolean>;
   onDelete: () => void;
 }) {
   const [color, setColor] = useState(definition.color);
+  const [category, setCategory] = useState(definition.category ?? "");
+  const categoryName = category.trim();
+  const validCategory = categoryName === "" || isThreadTag(categoryName);
   return (
     <form
       className="space-y-2"
       onSubmit={(event) => {
         event.preventDefault();
-        void onSave(color);
+        if (!validCategory) return;
+        void onSave({
+          name: definition.name,
+          color,
+          ...(categoryName ? { category: categoryName } : {}),
+        });
       }}
     >
       <div className="flex items-center gap-2">
@@ -252,13 +300,29 @@ function TagDefinitionEditor({
           style={{ backgroundColor: definition.color }}
         />
         <span className="min-w-0 flex-1 truncate text-sm">{definition.name}</span>
-        <Button type="submit" variant="outline" size="sm" disabled={color === definition.color}>
-          Save color
+        <Button
+          type="submit"
+          variant="outline"
+          size="sm"
+          disabled={
+            !validCategory ||
+            (color === definition.color && categoryName === (definition.category ?? ""))
+          }
+        >
+          Save
         </Button>
         <Button variant="ghost" size="sm" onClick={onDelete}>
           Delete
         </Button>
       </div>
+      <Input
+        aria-label={`${definition.name} category`}
+        placeholder="Category (optional)"
+        list={categoryOptionsId}
+        value={category}
+        maxLength={64}
+        onChange={(event) => setCategory(event.currentTarget.value)}
+      />
       <TagColorPicker value={color} onChange={setColor} label={`${definition.name} color`} />
     </form>
   );
