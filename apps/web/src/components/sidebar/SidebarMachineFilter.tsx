@@ -1,3 +1,4 @@
+import { T, useGT } from "gt-react";
 import { MonitorIcon } from "lucide-react";
 import type { EnvironmentId } from "@t3tools/contracts";
 
@@ -13,6 +14,7 @@ export function SidebarMachineFilter({
   selected: EnvironmentId | null;
   onChange: (environmentId: EnvironmentId | null) => void;
 }) {
+  const gt = useGT();
   return (
     <Menu>
       <MenuTrigger
@@ -20,8 +22,10 @@ export function SidebarMachineFilter({
           <SidebarHeaderIconButton
             label={
               selected === null
-                ? "Filter threads by machine"
-                : `Filter threads by machine: ${machines.get(selected) ?? selected}`
+                ? gt("Filter threads by machine")
+                : gt("Filter threads by machine: {machine}", {
+                    machine: machines.get(selected) ?? selected,
+                  })
             }
           />
         }
@@ -42,7 +46,9 @@ export function SidebarMachineFilter({
             }
           }}
         >
-          <MenuRadioItem value="">All machines</MenuRadioItem>
+          <MenuRadioItem value="">
+            <T>All machines</T>
+          </MenuRadioItem>
           {[...machines].map(([id, label]) => (
             <MenuRadioItem key={id} value={id}>
               {label}

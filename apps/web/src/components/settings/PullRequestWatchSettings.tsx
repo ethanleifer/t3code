@@ -1,6 +1,8 @@
+import { useGT } from "gt-react";
+
 import { Switch } from "../ui/switch";
 import { SettingsRow, SettingsSection } from "./settingsLayout";
-import { searchableSetting } from "./settingsSearch";
+import { useSearchableSetting } from "./settingsSearch";
 import {
   useScopedSettings,
   useScopedSettingsMixed,
@@ -11,15 +13,19 @@ export function PullRequestWatchSettingsSection() {
   const ignoreBots = useScopedSettings((settings) => settings.pullRequestWatchIgnoreBots);
   const updateSettings = useUpdateScopedSettings();
   const mixed = useScopedSettingsMixed(["pullRequestWatchIgnoreBots"]);
+  const gt = useGT();
+  const setting = useSearchableSetting();
 
   return (
-    <SettingsSection title="Pull request watching">
+    <SettingsSection title={gt("Pull request watching")}>
       <SettingsRow
         serverScoped
         settingKeys={["pullRequestWatchIgnoreBots"]}
         mixed={mixed}
-        {...searchableSetting("pull-request-watch-ignore-bots")}
-        description="Comments from bot accounts, such as CI, deploy, and review bots, do not wake an agent watching its pull request. Failed checks, conflicts, and comments from people still do."
+        {...setting("pull-request-watch-ignore-bots")}
+        description={gt(
+          "Comments from bot accounts, such as CI, deploy, and review bots, do not wake an agent watching its pull request. Failed checks, conflicts, and comments from people still do.",
+        )}
         control={
           <Switch
             mixed={mixed}
@@ -27,7 +33,7 @@ export function PullRequestWatchSettingsSection() {
             onCheckedChange={(checked) =>
               updateSettings({ pullRequestWatchIgnoreBots: Boolean(checked) })
             }
-            aria-label="Ignore bot comments"
+            aria-label={gt("Ignore bot comments")}
           />
         }
       />

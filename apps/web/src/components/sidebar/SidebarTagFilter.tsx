@@ -1,4 +1,5 @@
 import type { ThreadTagColor, ThreadTagDefinition } from "@t3tools/contracts";
+import { T, useGT } from "gt-react";
 import { TagIcon, XIcon } from "lucide-react";
 
 import type { SidebarGroupSort } from "../Sidebar.logic";
@@ -54,6 +55,7 @@ export function SidebarTagFilterMenu({
   grouping: SidebarGrouping;
   onGroupingChange: (grouping: SidebarGrouping) => void;
 }) {
+  const gt = useGT();
   const selectedDefinitions = definitions.filter((definition) =>
     selected.includes(definition.name),
   );
@@ -64,8 +66,8 @@ export function SidebarTagFilterMenu({
           <SidebarHeaderIconButton
             label={
               selected.length > 0
-                ? `Filter threads by tag: ${selected.join(", ")}`
-                : "Filter threads by tag"
+                ? gt("Filter threads by tag: {tags}", { tags: selected.join(", ") })
+                : gt("Filter threads by tag")
             }
           />
         }
@@ -86,33 +88,49 @@ export function SidebarTagFilterMenu({
       </MenuTrigger>
       <MenuPopup align="start" collisionAvoidance={{ side: "flip", align: "shift" }}>
         <MenuGroup>
-          <MenuGroupLabel>Group by</MenuGroupLabel>
+          <MenuGroupLabel>
+            <T>Group by</T>
+          </MenuGroupLabel>
           <MenuRadioGroup
             value={grouping}
             onValueChange={(value) => {
               if (value === "status" || value === "tag") onGroupingChange(value);
             }}
           >
-            <MenuRadioItem value="status">Status</MenuRadioItem>
-            <MenuRadioItem value="tag">Tag</MenuRadioItem>
+            <MenuRadioItem value="status">
+              <T context="thread status">Status</T>
+            </MenuRadioItem>
+            <MenuRadioItem value="tag">
+              <T context="noun, a thread tag">Tag</T>
+            </MenuRadioItem>
           </MenuRadioGroup>
         </MenuGroup>
         <MenuSeparator />
         <MenuGroup>
-          <MenuGroupLabel>Sort within groups · pinned first</MenuGroupLabel>
+          <MenuGroupLabel>
+            <T>Sort within groups · pinned first</T>
+          </MenuGroupLabel>
           <MenuRadioGroup
             value={sorting}
             onValueChange={(value) => {
               if (value === "status" || value === "activity") onSortingChange(value);
             }}
           >
-            <MenuRadioItem value="status">Status</MenuRadioItem>
-            <MenuRadioItem value="activity">Recent activity</MenuRadioItem>
+            <MenuRadioItem value="status">
+              <T context="thread status">Status</T>
+            </MenuRadioItem>
+            <MenuRadioItem value="activity">
+              <T>Recent activity</T>
+            </MenuRadioItem>
           </MenuRadioGroup>
         </MenuGroup>
         {definitions.length > 0 ? <MenuSeparator /> : null}
         <MenuGroup>
-          {definitions.length > 0 ? <MenuGroupLabel>Show threads tagged</MenuGroupLabel> : null}
+          {definitions.length > 0 ? (
+            <MenuGroupLabel>
+              <T>Show threads tagged</T>
+            </MenuGroupLabel>
+          ) : null}
           {definitions.map((definition) => (
             <MenuCheckboxItem
               key={definition.name}
@@ -136,7 +154,9 @@ export function SidebarTagFilterMenu({
         {selected.length > 0 ? (
           <>
             <MenuSeparator />
-            <MenuItem onClick={() => onSelectedChange([])}>Clear tag filter</MenuItem>
+            <MenuItem onClick={() => onSelectedChange([])}>
+              <T>Clear tag filter</T>
+            </MenuItem>
           </>
         ) : null}
       </MenuPopup>
@@ -182,9 +202,12 @@ export function SidebarActiveTagFilter({
   selected: readonly string[];
   onClear: () => void;
 }) {
+  const gt = useGT();
   return (
     <div className="flex min-w-0 items-center gap-1.5 px-2 pt-1 text-xs text-sidebar-muted-foreground">
-      <span className="shrink-0">Tagged</span>
+      <span className="shrink-0">
+        <T>Tagged</T>
+      </span>
       <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate">
         {selected.map((name) => {
           const definition = definitions.find((definition) => definition.name === name);
@@ -201,7 +224,7 @@ export function SidebarActiveTagFilter({
         size="icon-micro"
         variant="ghost-muted"
         className="shrink-0"
-        aria-label="Clear tag filter"
+        aria-label={gt("Clear tag filter")}
         onClick={onClear}
       >
         <XIcon className="size-3" />

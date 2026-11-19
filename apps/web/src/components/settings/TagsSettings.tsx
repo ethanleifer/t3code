@@ -9,6 +9,7 @@ import {
   isManagedSettingPath,
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
+import { T, useGT, Var } from "gt-react";
 import { useState } from "react";
 import { useEnvironmentSettings } from "../../hooks/useSettings";
 import { useThreadShells } from "../../state/entities";
@@ -26,7 +27,7 @@ import {
   AlertDialogTitle,
 } from "../ui/alert-dialog";
 import { useSettingsScope } from "./SettingsScopeContext";
-import { searchableSetting } from "./settingsSearch";
+import { useSearchableSetting } from "./settingsSearch";
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsLayout";
 
 const isThreadTag = Schema.is(ThreadTag);
@@ -40,13 +41,14 @@ function TagColorPicker({
   onChange: (color: ThreadTagColor) => void;
   label: string;
 }) {
+  const gt = useGT();
   return (
     <div role="group" aria-label={label} className="flex flex-wrap items-center gap-2">
       {THREAD_TAG_COLOR_PRESETS.map((color) => (
         <button
           key={color}
           type="button"
-          aria-label={`${label}: ${color}`}
+          aria-label={gt("{label}: {color}", { label, color })}
           aria-pressed={value.toLowerCase() === color}
           className="size-6 rounded-full border-2 border-transparent -outline-offset-2 aria-pressed:border-foreground focus-visible:outline-2 focus-visible:outline-ring"
           style={{ backgroundColor: color }}
@@ -54,10 +56,10 @@ function TagColorPicker({
         />
       ))}
       <label className="flex items-center gap-2 text-xs text-muted-foreground">
-        Custom
+        <T>Custom</T>
         <input
           type="color"
-          aria-label={`Custom ${label.toLowerCase()}`}
+          aria-label={gt("Custom {label}", { label: label.toLowerCase() })}
           value={value}
           onChange={(event) => onChange(event.currentTarget.value)}
         />
@@ -71,7 +73,9 @@ export function TagsSettingsPanel() {
   return (
     <SettingsPageContainer>
       {scope.kind !== "environment" || !environment ? (
-        <p className="text-sm text-muted-foreground">Select an environment to manage its tags.</p>
+        <p className="text-sm text-muted-foreground">
+          <T>Select an environment to manage its tags.</T>
+        </p>
       ) : (
         <EnvironmentTagsSettings
           key={environment.environmentId}
@@ -100,6 +104,8 @@ function EnvironmentTagsSettings({
   const threads = useThreadShells();
   const canWrite = useAtomValue(serverEnvironment.updateSettings.permissionAtom(environmentId));
   const persist = useAtomCommand(serverEnvironment.updateSettings);
+  const gt = useGT();
+  const setting = useSearchableSetting();
   const [pending, setPending] = useState(false);
   const [name, setName] = useState("");
   const [color, setColor] = useState<ThreadTagColor>(THREAD_TAG_COLOR_PRESETS[0]);
@@ -123,16 +129,20 @@ function EnvironmentTagsSettings({
       thread.source.tags?.includes(deleting.name),
   ).length;
   return (
-    <SettingsSection {...searchableSetting("thread-tags")}>
+    <SettingsSection {...setting("thread-tags")}>
       <SettingsRow
-        title="Tag definitions"
-        description="Create tags for this environment, then apply them from a thread's Tags menu. Names are case-sensitive."
+        title={gt("Tag definitions")}
+        description={gt(
+          "Create tags for this environment, then apply them from a thread's Tags menu. Names are case-sensitive.",
+        )}
         serverScoped
         settingKeys={["threadTagDefinitions"]}
       >
         <fieldset disabled={disabled} className="space-y-4 pb-3">
           {definitions.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No tags yet.</p>
+            <p className="text-xs text-muted-foreground">
+              <T>No tags yet.</T>
+            </p>
           ) : null}
           {definitions.map((definition) => (
             <TagDefinitionEditor
@@ -163,29 +173,31 @@ function EnvironmentTagsSettings({
             }}
           >
             <Input
-              aria-label="New tag name"
-              placeholder="Tag name"
+              aria-label={gt("New tag name")}
+              placeholder={gt("Tag name")}
               value={name}
               maxLength={64}
               onChange={(event) => setName(event.currentTarget.value)}
             />
-            <TagColorPicker value={color} onChange={setColor} label="New tag color" />
+            <TagColorPicker value={color} onChange={setColor} label={gt("New tag color")} />
             <Button
               type="submit"
               size="sm"
               variant="outline"
               disabled={!validName || definitions.length >= MAX_THREAD_TAG_DEFINITIONS}
             >
-              Create tag
+              <T>Create tag</T>
             </Button>
             {name.trim() !== "" && !validName ? (
               <p className="text-xs text-muted-foreground">
-                Use a unique, single-line name of up to 64 characters.
+                <T>Use a unique, single-line name of up to 64 characters.</T>
               </p>
             ) : null}
             {definitions.length >= MAX_THREAD_TAG_DEFINITIONS ? (
               <p className="text-xs text-muted-foreground">
-                Up to {MAX_THREAD_TAG_DEFINITIONS} tags per environment.
+                <T>
+                  Up to <Var>{MAX_THREAD_TAG_DEFINITIONS}</Var> tags per environment.
+                </T>
               </p>
             ) : null}
           </form>
@@ -199,14 +211,22 @@ function EnvironmentTagsSettings({
       >
         <AlertDialogPopup>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete tag {deleting?.name}?</AlertDialogTitle>
+            <AlertDialogTitle>
+              <T>
+                Delete tag <Var>{deleting?.name}</Var>?
+              </T>
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This removes the tag from all threads in this environment. Approximately {count}{" "}
-              loaded threads use it; unloaded threads may also be affected.
+              {gt(
+                "This removes the tag from all threads in this environment. {count, plural, one {Approximately {count} loaded thread uses it} other {Approximately {count} loaded threads use it}}; unloaded threads may also be affected.",
+                { count },
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+            <AlertDialogClose render={<Button variant="outline" />}>
+              <T>Cancel</T>
+            </AlertDialogClose>
             <Button
               variant="destructive"
               disabled={disabled}
@@ -219,7 +239,7 @@ function EnvironmentTagsSettings({
                 });
               }}
             >
-              Delete tag
+              <T>Delete tag</T>
             </Button>
           </AlertDialogFooter>
         </AlertDialogPopup>
@@ -237,6 +257,7 @@ function TagDefinitionEditor({
   onSave: (color: ThreadTagColor) => Promise<boolean>;
   onDelete: () => void;
 }) {
+  const gt = useGT();
   const [color, setColor] = useState(definition.color);
   return (
     <form
@@ -253,13 +274,17 @@ function TagDefinitionEditor({
         />
         <span className="min-w-0 flex-1 truncate text-sm">{definition.name}</span>
         <Button type="submit" variant="outline" size="sm" disabled={color === definition.color}>
-          Save color
+          <T>Save color</T>
         </Button>
         <Button variant="ghost" size="sm" onClick={onDelete}>
-          Delete
+          <T context="verb, delete a tag">Delete</T>
         </Button>
       </div>
-      <TagColorPicker value={color} onChange={setColor} label={`${definition.name} color`} />
+      <TagColorPicker
+        value={color}
+        onChange={setColor}
+        label={gt("{name} color", { name: definition.name })}
+      />
     </form>
   );
 }

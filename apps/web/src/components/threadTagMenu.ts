@@ -1,4 +1,7 @@
 import type { ContextMenuItem, ThreadTagDefinition } from "@t3tools/contracts";
+import { msg } from "gt-react";
+
+import { m, type MessageResolver } from "~/i18n/messages";
 
 export type ThreadTagMenuId = "tags" | "manage-tags" | `tag:add:${string}` | `tag:remove:${string}`;
 
@@ -8,6 +11,7 @@ export function buildThreadTagMenu(
     readonly tags: readonly string[];
     readonly canTag: boolean;
   }[],
+  resolve: MessageResolver = m,
 ): ContextMenuItem<ThreadTagMenuId> {
   const first = targets[0];
   const definitions =
@@ -35,13 +39,17 @@ export function buildThreadTagMenu(
   for (const tag of legacyTags) {
     children.push({
       id: `tag:remove:${tag}`,
-      label: `Remove ${tag}`,
+      label: resolve(msg("Remove {tag}", { tag })),
       checked: true,
       disabled: !canTag,
     });
   }
-  children.push({ id: "manage-tags", label: "Manage tags…", separatorBefore: children.length > 0 });
-  return { id: "tags", label: "Tags", icon: "tags", children };
+  children.push({
+    id: "manage-tags",
+    label: resolve(msg("Manage tags…")),
+    separatorBefore: children.length > 0,
+  });
+  return { id: "tags", label: resolve(msg("Tags")), icon: "tags", children };
 }
 
 export function threadTagAction(action: string) {
