@@ -534,7 +534,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       : []),
     ...(settings.sidebarWorkingShelfHidesWaiting !==
     DEFAULT_UNIFIED_SETTINGS.sidebarWorkingShelfHidesWaiting
-      ? ["Waiting threads in Working"]
+      ? [gt("Waiting section")]
       : []),
     ...(settings.sidebarAutoSettleAfterDays !== DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleAfterDays
       ? [gt("Auto-settle inactive threads")]
@@ -973,13 +973,13 @@ export function GeneralSettingsPanel() {
         <SettingsRow
           {...setting("working-shelf-hides-waiting")}
           description={gt(
-            "Keep idle threads, and threads waiting on another thread, in the inbox instead of the Working section.",
+            "Move idle threads, and threads waiting on another thread, out of Working into their own Waiting section.",
           )}
           resetAction={
             settings.sidebarWorkingShelfHidesWaiting !==
             DEFAULT_UNIFIED_SETTINGS.sidebarWorkingShelfHidesWaiting ? (
               <SettingResetButton
-                ariaLabel={gt("Reset waiting threads in Working to default")}
+                ariaLabel={gt("Reset Waiting section to default")}
                 onClick={() =>
                   updateSettings({
                     sidebarWorkingShelfHidesWaiting:
@@ -996,7 +996,7 @@ export function GeneralSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ sidebarWorkingShelfHidesWaiting: Boolean(checked) })
               }
-              aria-label={gt("Keep waiting threads out of Working")}
+              aria-label={gt("Separate Waiting section")}
             />
           }
         />

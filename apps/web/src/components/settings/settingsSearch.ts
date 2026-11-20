@@ -499,7 +499,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "working-shelf-hides-waiting",
-    title: msg("Keep waiting threads out of Working"),
+    title: msg("Separate Waiting section"),
     to: "/settings/general",
     searchTerms: [msg("waiting idle working section inbox sidebar shelf")],
   },
