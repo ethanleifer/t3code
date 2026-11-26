@@ -86,6 +86,7 @@ function normalizeContextMenuItems(source: readonly ContextMenuItem[]): ContextM
       ...(sourceItem.separatorBefore === true ? { separatorBefore: true } : {}),
       ...(typeof sourceItem.checked === "boolean" ? { checked: sourceItem.checked } : {}),
       ...(sourceItem.swatch === undefined ? {} : { swatch: sourceItem.swatch }),
+      ...(typeof sourceItem.iconImage === "string" ? { iconImage: sourceItem.iconImage } : {}),
     };
 
     if (sourceItem.children) {
@@ -140,6 +141,17 @@ const normalizePosition = (
   ).pipe(
     Option.map(({ x, y }) => ({ x: Math.floor(x * zoomFactor), y: Math.floor(y * zoomFactor) })),
   );
+
+// Renderer icons are 32px PNGs; a 2x representation keeps them 16pt and sharp on Retina.
+function menuIconImage(dataUrl: string): Option.Option<Electron.NativeImage> {
+  try {
+    const image = Electron.nativeImage.createEmpty();
+    image.addRepresentation({ scaleFactor: 2, dataURL: dataUrl });
+    return image.isEmpty() ? Option.none() : Option.some(image);
+  } catch {
+    return Option.none();
+  }
+}
 
 /** @public */
 export const make = Effect.gen(function* () {
@@ -207,6 +219,11 @@ export const make = Effect.gen(function* () {
       }
       if (item.swatch !== undefined) {
         itemOption.icon = drawSwatch(item.swatch);
+      } else if (item.iconImage !== undefined) {
+        const image = menuIconImage(item.iconImage);
+        if (Option.isSome(image)) {
+          itemOption.icon = image.value;
+        }
       }
       if (item.destructive && (!item.children || item.children.length === 0)) {
         const destructiveIcon = getDestructiveMenuIcon();
