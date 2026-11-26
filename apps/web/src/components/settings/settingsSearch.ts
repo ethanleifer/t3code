@@ -1358,15 +1358,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     scope: "project-defaults",
   },
   {
-    id: "pull-request-watch-ignore-bots",
-    title: msg("Ignore bot comments"),
-    to: "/settings/source-control",
-    searchTerms: [
-      msg("pull request pr watch babysit wake agent bots review comments noise filter"),
-    ],
-    environmentOnly: true,
-  },
-  {
     id: "project-actions",
     title: msg("Actions"),
     to: "/settings/projects",

@@ -43,7 +43,6 @@ import { SourceControlAppSignInSettings } from "./SourceControlAppSignInSettings
 import { SourceControlTokenSettings } from "./SourceControlTokenSettings";
 import { RedactedSensitiveText } from "./RedactedSensitiveText";
 import { SourceControlWritingSettingsSection } from "./SourceControlWritingSettings";
-import { PullRequestWatchSettingsSection } from "./PullRequestWatchSettings";
 import {
   SettingsPageContainer,
   SettingsSearchTarget,
@@ -661,7 +660,6 @@ export function SourceControlSettingsPanel() {
       )}
 
       <SourceControlWritingSettingsSection />
-      <PullRequestWatchSettingsSection />
     </SettingsPageContainer>
   );
 }
