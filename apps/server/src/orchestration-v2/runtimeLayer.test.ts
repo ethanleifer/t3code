@@ -4044,6 +4044,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
         commandId: CommandId.make("runtime-layer-tag-definition-archive"),
         threadId: threadIds[1]!,
       });
+
       const kept = { name: "kept", color: "#3b82f6" } as const;
       const settings = yield* Effect.provide(
         ServerSettings.ServerSettingsService,
@@ -4062,6 +4063,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
         Effect.provide(NodeCrypto.layer),
       );
       yield* Fiber.join(yield* cleanup.start());
+
       for (const threadId of threadIds) {
         assert.deepEqual((yield* orchestrator.getThreadProjection(threadId)).thread.tags, [
           "kept",
@@ -4070,6 +4072,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
       }
     }).pipe(Effect.scoped),
   );
+
   it.effect("keeps the branch pull request when linking another pull request", () =>
     Effect.gen(function* () {
       const orchestrator = yield* Orchestrator.OrchestratorV2;
@@ -4965,6 +4968,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
             Layer.mergeAll(
               NodeServices.layer,
               NodeCrypto.layer,
+              ServerSettings.layerTest(),
               Layer.mock(PullRequestService.PullRequestService)({
                 watchFingerprint: () => Effect.succeed(null),
                 detail: () =>
@@ -5106,6 +5110,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
           Layer.mergeAll(
             NodeServices.layer,
             NodeCrypto.layer,
+            ServerSettings.layerTest(),
             Layer.mock(PullRequestService.PullRequestService)({
               detail: () =>
                 Effect.succeed({
@@ -5220,6 +5225,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
         const host = Layer.mergeAll(
           NodeServices.layer,
           NodeCrypto.layer,
+          ServerSettings.layerTest(),
           Layer.mock(PullRequestService.PullRequestService)({
             detail: (input) =>
               Effect.sync(() => states.get(input.number)!).pipe(
@@ -5367,6 +5373,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
       const host = Layer.mergeAll(
         NodeServices.layer,
         NodeCrypto.layer,
+        ServerSettings.layerTest(),
         Layer.mock(PullRequestService.PullRequestService)({
           detail: () =>
             Effect.sync(() => ({
@@ -5518,6 +5525,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
             Layer.mergeAll(
               NodeServices.layer,
               NodeCrypto.layer,
+              ServerSettings.layerTest(),
               Layer.mock(PullRequestService.PullRequestService)({
                 watchFingerprint: () =>
                   reason === "rate-limited"
@@ -5593,6 +5601,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
           Layer.mergeAll(
             NodeServices.layer,
             NodeCrypto.layer,
+            ServerSettings.layerTest(),
             Layer.mock(PullRequestService.PullRequestService)({
               watchFingerprint: () => Effect.succeed(null),
               detail: () =>
@@ -5719,6 +5728,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
         const host = Layer.mergeAll(
           NodeServices.layer,
           NodeCrypto.layer,
+          ServerSettings.layerTest(),
           Layer.mock(PullRequestService.PullRequestService)({
             detail: () =>
               Effect.sync(() => ({
@@ -5815,6 +5825,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
       const host = Layer.mergeAll(
         NodeServices.layer,
         NodeCrypto.layer,
+        ServerSettings.layerTest(),
         Layer.mock(PullRequestService.PullRequestService)({
           detail: () =>
             Effect.sync(() => ({
@@ -5948,6 +5959,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
         const host = Layer.mergeAll(
           NodeServices.layer,
           NodeCrypto.layer,
+          ServerSettings.layerTest(),
           Layer.mock(PullRequestService.PullRequestService)({
             detail: (input) =>
               Effect.sync(() => ({
@@ -6067,6 +6079,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
         const host = Layer.mergeAll(
           NodeServices.layer,
           NodeCrypto.layer,
+          ServerSettings.layerTest(),
           Layer.mock(PullRequestService.PullRequestService)({
             detail: (input) =>
               Effect.gen(function* () {
@@ -6209,6 +6222,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
       const host = Layer.mergeAll(
         NodeServices.layer,
         NodeCrypto.layer,
+        ServerSettings.layerTest(),
         Layer.mock(PullRequestService.PullRequestService)({
           detail: () =>
             Effect.sync(() => ({
@@ -6363,6 +6377,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
       const host = Layer.mergeAll(
         NodeServices.layer,
         NodeCrypto.layer,
+        ServerSettings.layerTest(),
         Layer.mock(PullRequestService.PullRequestService)({
           detail: () =>
             Effect.sync(() => ({
@@ -6462,6 +6477,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
       const host = Layer.mergeAll(
         NodeServices.layer,
         NodeCrypto.layer,
+        ServerSettings.layerTest(),
         Layer.mock(PullRequestService.PullRequestService)({
           detail: () =>
             Effect.sync(() => ({
@@ -6573,6 +6589,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
         const host = Layer.mergeAll(
           NodeServices.layer,
           NodeCrypto.layer,
+          ServerSettings.layerTest(),
           Layer.mock(PullRequestService.PullRequestService)({
             detail: () =>
               Queue.offer(detailReads, undefined).pipe(
@@ -6683,6 +6700,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
         const host = Layer.mergeAll(
           NodeServices.layer,
           NodeCrypto.layer,
+          ServerSettings.layerTest(),
           Layer.mock(PullRequestService.PullRequestService)({
             // Earlier tests can leave watches in other projects; only this one's reads count.
             detail: (input) =>
@@ -6816,6 +6834,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
       const host = Layer.mergeAll(
         NodeServices.layer,
         NodeCrypto.layer,
+        ServerSettings.layerTest(),
         Layer.mock(PullRequestService.PullRequestService)({
           detail: () =>
             Effect.sync(() => ({
@@ -6934,6 +6953,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
         const host = Layer.mergeAll(
           NodeServices.layer,
           NodeCrypto.layer,
+          ServerSettings.layerTest(),
           Layer.mock(PullRequestService.PullRequestService)({
             // The host reports the same fingerprint throughout, so only the deadline can prompt a read.
             watchFingerprint: () =>
@@ -7043,6 +7063,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
         const host = Layer.mergeAll(
           NodeServices.layer,
           NodeCrypto.layer,
+          ServerSettings.layerTest(),
           Layer.mock(PullRequestService.PullRequestService)({
             watchFingerprint: () => Effect.sync(() => ({ status, remarks: "none", coversDetail })),
             invalidate: () => Effect.void,
@@ -7212,6 +7233,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
       const host = Layer.mergeAll(
         NodeServices.layer,
         NodeCrypto.layer,
+        ServerSettings.layerTest(),
         Layer.mock(PullRequestService.PullRequestService)({
           watchFingerprint: () =>
             Effect.succeed({ status: removal?.id ?? "green", remarks: "none" }),
@@ -7360,6 +7382,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
           Layer.mergeAll(
             NodeServices.layer,
             NodeCrypto.layer,
+            ServerSettings.layerTest(),
             Layer.mock(PullRequestService.PullRequestService)({
               detail: () => Effect.succeed(detail),
               activity: () =>
@@ -7859,6 +7882,7 @@ it.layer(layerTest)("OrchestrationV2LayerLive lifecycle", (it) => {
       const host = Layer.mergeAll(
         NodeServices.layer,
         NodeCrypto.layer,
+        ServerSettings.layerTest(),
         Layer.mock(PullRequestService.PullRequestService)({
           watchFingerprint: (input) =>
             input.number === 21

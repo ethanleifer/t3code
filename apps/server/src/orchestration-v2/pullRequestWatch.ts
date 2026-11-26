@@ -66,6 +66,7 @@ export function evaluatePullRequestWatch(
   >,
   remarks: ReadonlyArray<PullRequestComment> | null,
   now: number,
+  ignoreBots = false,
 ): PullRequestWatchReport {
   const changes: Array<PullRequestWatchChange> = [];
   // A read without a head says nothing about pushes, so it keeps the last known one.
@@ -230,7 +231,10 @@ export function evaluatePullRequestWatch(
       remark.author?.login.toLowerCase() !== own
     );
   });
-  const actionable = fresh.filter((remark) => !isReviewAcknowledgement(remark));
+  // Ignored remarks still advance the watermark, so lifting the filter does not replay them.
+  const actionable = fresh.filter(
+    (remark) => !isReviewAcknowledgement(remark) && !(ignoreBots && remark.author?.isBot === true),
+  );
   if (actionable.length > 0) changes.push({ kind: "remarks", remarks: actionable });
   const latest = Math.max(through, ...fresh.map((remark) => Date.parse(activeAt(remark))));
   const atLatest = fresh.filter((remark) => Date.parse(activeAt(remark)) === latest);
