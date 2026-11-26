@@ -2676,6 +2676,24 @@
   "3260b22f72f7effb": "{tooltipLead}: {title}",
   "feac8e54b30c5a03": "Terminal process running",
   "fc2c9a91f498ad6b": "{count, plural, one {{count} terminal process running. Open terminal} other {{count} terminal processes running. Open terminal}}",
+  "06d3fe3e6b255d15": [
+    "+",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " more"
+  ],
+  "f1b18820c0ab93ac": [
+    "+",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " more in Linked items"
+  ],
   "56f37ff8ca568059": "stack",
   "6831e9a46cbd8939": "chain",
   "9aa9e74a3b7eee91": "Add to chat",
@@ -3332,6 +3350,9 @@
   "f2a955905704b91d": "{hours}h {minutes}m",
   "3609f564a63c8eca": "{minutes}m",
   "9251bb742f60720d": "{hours}h",
+  "035aab5e99159bd8": "{count, plural, one {… {hidden} character in the middle is not shown.} other {… {hidden} characters in the middle are not shown.}} The text ends with:",
+  "011b1ef726fa9928": "Scroll each part to read all of it.",
+  "6c6e16b9488f8b91": "Scroll to read all of it.",
   "a1e982c6047c0860": "Go to quoted response: {label}",
   "c156140c3f5ebb75": "Go to the response this replies to: {label}",
   "f8031a49c6e9fe25": "View cited assistant text: {label}",
@@ -3508,7 +3529,7 @@
   "12170596ff889d5b": "Attach again",
   "748efc40dc99b309": "Remove to send",
   "fd3d4318e7b094fa": "Draft",
-  "9c421cab815b9905": "{count, plural, one {Show {count} more image attachments} other {Show {count} more image attachments}}",
+  "c7f5c98f1e79cc6c": "{count, plural, one {Show {count} more image attachment} other {Show {count} more image attachments}}",
   "ae136257600738d3": "Attach files",
   "3e04fb123bbf31b4": "Draft attachment could not be saved locally and may be lost on navigation.",
   "81709882b9996586": "Attach files",
@@ -4979,12 +5000,13 @@
   "13cf3cd978eef92a": "Keep attachments on this machine",
   "a4ca7da61227002d": "Remove attachments before choosing automatic routing, then attach them on the selected machine.",
   "512d8afab852df1a": "Could not switch machine",
+  "ee3ea4351c88e7d7": "This project is no longer available.",
   "32e421d1e2dfdaff": "Checking machines…",
   "0db14066bd4ce117": "Auto balance unavailable",
   "55b562c00e37321b": "Could not force stop the agent",
   "ede15a83eedec569": "Turn stopped; the agent is still shutting down",
   "f360accf1ccac178": "Turn stopped; the agent process kept running",
-  "5b660a378c56cc91": "{others, plural, =0 {It is shared with other working threads. Stop those to free it.} one {It is shared with {others} working thread. Stop those to free it.} other {It is shared with {others} working threads. Stop those to free it.}}",
+  "46f927ee332c1065": "{others, plural, =0 {It is shared with other working threads. Stop those to free it.} one {It is shared with {others} working thread. Stop that thread to free it.} other {It is shared with {others} working threads. Stop those to free it.}}",
   "f5948facf9a10261": "{count, plural, one {Started {count} thread in background} other {Started {count} threads in background}}",
   "d2a83704191622a6": "Failed to send messages.",
   "c11072d4a6072902": "A background prompt could not be sent",
@@ -5385,9 +5407,12 @@
   "c928303400ccaf24": "The device hub failed to start.",
   "4cb21672153c1f18": "No simulators or emulators were found on this environment.",
   "c82410197256eb53": "iOS Simulators",
+  "31a71fec6b5f2bf3": "Android Devices",
   "ac18a5e35195a258": "Android Emulators",
   "94215375ea2558b8": "Running",
   "f8a65d4d662389b0": "Stopped",
+  "381ceed77cb8b2b3": "Stop {name}",
+  "5b9fda36b610d25c": "Stop",
   "b1687c7b2b91e569": "Open {name}",
   "4b4ef3f2e2ed2c56": "Start {name}",
   "08098a6fb84e8a34": "Open",
@@ -5410,6 +5435,7 @@
   ],
   "e902f208c4e6146f": "No Android virtual devices found. Create one in Android Studio's Device Manager, then refresh.",
   "d9a71f3db685cb0e": "Refresh devices",
+  "1d372f6d555dde3c": "Stop all devices",
   "4ad8ced64defdf73": "Interactive 3D device. Drag the screen to interact. Drag outside it or swipe with two fingers to turn.",
   "84e4baf07ad8883d": "Enable this environment to open simulators and emulators, whether they run here or on a remote device host.",
   "771365c337509a82": "Allow new agent sessions in this environment to start and control local and remote devices, with required tools set up automatically.",
@@ -6939,6 +6965,19 @@
   "36b7fbe31bde05f3": "This repository has no labels.",
   "2764eab1d2853980": "This repository has more labels than are listed here. Apply the rest on the host.",
   "5e5917c3b907c7d6": "Applied",
+  "4affc3da49f673c2": [
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " ",
+    {
+      "t": "span",
+      "i": 2,
+      "c": "commented"
+    }
+  ],
   "404ee0e0134b60ae": "Searching every host for “{query}”",
   "ca612a0074954046": "Checking...",
   "8b04f78f836b6c11": "Nothing under these filters",
@@ -7235,19 +7274,6 @@
       "t": "span",
       "i": 2,
       "c": "reviewed"
-    }
-  ],
-  "4affc3da49f673c2": [
-    {
-      "i": 1,
-      "k": "_gt_value_1",
-      "v": "v"
-    },
-    " ",
-    {
-      "t": "span",
-      "i": 2,
-      "c": "commented"
     }
   ],
   "04ea50285b00dcdd": "Overview",
@@ -9307,7 +9333,6 @@
   "b76e857a764ea02a": "Grouping rule for {path} on {environment}",
   "e6e55f343639ae71": "Default ({mode})",
   "87158e7b8e714bc6": "Add a project from the sidebar to configure it here.",
-  "ee3ea4351c88e7d7": "This project is no longer available.",
   "062d19d24615e108": "Project title cannot be empty",
   "303af9de2741db90": "Failed to rename project",
   "f578154800d7af01": "Failed to update project icon",
@@ -9703,6 +9728,7 @@
   "9bc60e1d0ef816cf": "Storage bytes",
   "85de927f664ee3cb": "Logical bytes",
   "ec1f81bc9b395fb9": "All I/O bytes",
+  "9fd31461cee8ff82": "{count, plural, one {{count} process} other {{count} processes}}",
   "7905928d59208450": "Read",
   "637254a20a8e24a5": "Write",
   "ab9f29f78275f7bd": "Available when this page runs inside the desktop app.",
