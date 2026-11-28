@@ -1182,10 +1182,13 @@ const SIDEBAR_STATUS_ORDER = {
   request: 2,
   failed: 3,
   limited: 4,
-  ready: 5,
-  preparing: 6,
-  working: 7,
-  waiting: 8,
+  offline: 5,
+  ready: 6,
+  preparing: 7,
+  connecting: 8,
+  reconnecting: 8,
+  working: 8,
+  waiting: 9,
 } satisfies Record<SidebarThreadStatus, number>;
 
 export function sortSidebarGroupThreads<T extends SidebarThreadSummary>(
@@ -1199,7 +1202,7 @@ export function sortSidebarGroupThreads<T extends SidebarThreadSummary>(
       thread,
       status:
         thread.settledOverride === "settled"
-          ? 9
+          ? 10
           : SIDEBAR_STATUS_ORDER[resolveSidebarThreadStatus(thread)],
       activity: toSortableTimestamp(resolveThreadActivityTimestamp(thread) ?? undefined) ?? 0,
     }))
